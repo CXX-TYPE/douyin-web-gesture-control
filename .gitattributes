@@ -1,0 +1,48 @@
+# ---------- 换行符统一策略 ----------
+# 所有文本文件入库统一为 LF，检出到工作区也是 LF
+# 目的：跨 Windows / macOS / Linux 协作时 diff 不出现整行变更
+* text=auto eol=lf
+
+# ---------- 例外：必须保留 CRLF 的 Windows 脚本 ----------
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# ---------- 二进制文件：禁止任何换行符转换 ----------
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.bmp   binary
+*.avif  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.eot   binary
+*.mp3   binary
+*.wav   binary
+*.mp4   binary
+*.webm  binary
+*.mov   binary
+*.pdf   binary
+*.zip   binary
+*.7z    binary
+*.xlsx  binary
+*.docx  binary
+
+# ---------- 语言与 diff 友好 ----------
+*.json  text eol=lf
+*.md    text eol=lf
+*.html  text eol=lf
+*.css   text eol=lf
+*.js    text eol=lf
+*.ts    text eol=lf
+*.svg   text eol=lf
+
+# 二进制文件在 diff / merge 时按「不可合并」处理
+*.png   -diff
+*.jpg   -diff
+*.woff2 -diff
