@@ -1,0 +1,57 @@
+# ---------- 依赖 ----------
+node_modules/
+.pnp
+.pnp.js
+bower_components/
+jspm_packages/
+
+# ---------- 构建产物 ----------
+dist/
+build/
+out/
+.output/
+*.tsbuildinfo
+*.min.js.map
+
+# ---------- 缓存 ----------
+.cache/
+.parcel-cache/
+.turbo/
+.vite/
+.eslintcache
+.stylelintcache
+
+# ---------- 日志 ----------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------- 环境变量 / 密钥 ----------
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+!*.pub
+
+# ---------- 编辑器 / 系统 ----------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- WorkBuddy 项目元数据 ----------
+.workbuddy/
+
+# ---------- 临时文件 ----------
+*.tmp
+*.bak
+*.orig
+~$*
