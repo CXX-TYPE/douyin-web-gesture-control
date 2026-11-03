@@ -385,7 +385,7 @@
     on:false, starting:false, stream:null, hands:null, running:false,
     lastFire:0, triggers:0, latencies:[], fps:0,
     frames:0, fpsT0:0, busy:false, lastUI:0, handSeen:false,
-    poseNow:0, poseSince:0, locked:false, lastDir:0
+    poseNow:0, poseSince:0, locked:false, lastDir:0, frameSeq:0, lastSentSeq:-1, fpsTimer:null, rvfcOn:false, results:0
   };
   var current = 0;
 
@@ -543,14 +543,8 @@
   }
 
   function onResults(res){
-    S.frames++;
+    S.results++;              // 只用于自测：确认帧确实送到了模型
     var now = performance.now();
-    if (now - S.fpsT0 > 800) {
-      S.fps = Math.round(S.frames * 1000 / (now - S.fpsT0));
-      S.frames = 0; S.fpsT0 = now;
-      previewFps.textContent = S.fps + ' fps';
-      $('mFps').textContent = S.fps + ' fps';
-    }
 
     var lm = res.multiHandLandmarks && res.multiHandLandmarks[0];
     drawHand(lm);
@@ -596,9 +590,10 @@
       setChip('c1', true); setChip('c2', c2); setChip('c3', c3); setChip('c4', c4);
       $('nFingers').textContent = e.pose ? ('比 ' + e.pose) : (e.ext.filter(Boolean).length + ' 指');
       $('nFace').textContent = e.faceRatio.toFixed(2) + (e.faceRatio > 0.55 ? ' 正对' : ' 侧对');
-      $('nHold').textContent = Math.round(held) + ' / ' + P.hold + 'ms';
+      // 锁定后不再往上累加，否则会出现「保持 6004 / 300ms」这种看着像 bug 的数字
+      $('nHold').textContent = S.locked ? '已触发' : (Math.round(held) + ' / ' + P.hold + 'ms');
       $('nLock').textContent = S.locked ? '是' : '否';
-      pipeTimer.textContent = Math.round(held) + ' / ' + P.hold + 'ms';
+      pipeTimer.textContent = S.locked ? '已触发' : (Math.round(held) + ' / ' + P.hold + 'ms');
       handState.textContent = S.locked ? '已触发 · 收手或换手势'
         : (hint ? hint : (e.pose ? ('已识别 · 比 ' + e.pose) : '已检测到手'));
       handState.className = hint && !S.locked ? 'warn' : '';
@@ -628,6 +623,36 @@
     video.srcObject = stream;
     await video.play();
     overlay.width = 640; overlay.height = 480;
+
+    // 用按帧回调统计真实帧率；currentTime 对 MediaStream 是连续时间，不能拿来判重
+    S.frameSeq = 0; S.lastSentSeq = -1;
+    // 注意：这里不能判 S.running，startCamera 时它还没置位；
+    // 用 S.stream 作为摄像头是否在运行的判据，stopCamera 会把 stream 置空
+    if (video.requestVideoFrameCallback && !S.rvfcOn) {
+      S.rvfcOn = true;
+      (function tick(){
+        if (!S.stream) { S.rvfcOn = false; return; }
+        S.frameSeq++;
+        video.requestVideoFrameCallback(tick);
+      })();
+    }
+    startFpsMeter();
+  }
+
+  function startFpsMeter(){
+    clearInterval(S.fpsTimer);
+    var last = S.frameSeq, t0 = performance.now();
+    S.fpsTimer = setInterval(function(){
+      if (!S.stream) { clearInterval(S.fpsTimer); return; }
+      var t = performance.now();
+      var n = video.requestVideoFrameCallback ? (S.frameSeq - last) : S.frames;
+      var fps = Math.round(n * 1000 / (t - t0));
+      last = S.frameSeq; t0 = t;
+      if (fps > 0) {
+        previewFps.textContent = fps + ' fps';
+        $('mFps').textContent = fps + ' fps';
+      }
+    }, 800);
   }
 
   function stopCamera(){
@@ -661,7 +686,11 @@
 
   async function pump(){
     if (!S.running) return;
-    if (video.readyState >= 2 && !S.busy) {
+    // 只在确实来了新画面时才送模型：rAF 是 60Hz，摄像头只有 30fps，
+    // 不判重会把同一帧送两遍，白烧 CPU 还会把帧率读数算成 48
+    var fresh = !video.requestVideoFrameCallback || S.frameSeq !== S.lastSentSeq;
+    if (video.readyState >= 2 && !S.busy && fresh) {
+      S.lastSentSeq = S.frameSeq;
       S.busy = true;
       try { await S.hands.send({ image: video }); } catch (err) {}
       S.busy = false;
@@ -712,6 +741,7 @@
   function disable(){
     S.on = false;
     S.running = false;
+    clearInterval(S.fpsTimer);
     S.handSeen = false;
     S.poseNow = 0; S.poseSince = 0; S.locked = false; S.lastDir = 0;
     stopCamera();
@@ -847,7 +877,7 @@
     feed:function(lm){ onResults({ multiHandLandmarks: lm ? [lm] : [] }); },
     // 测试用：跳过摄像头直接置位运行态，避免真实帧与合成帧互相干扰
     forceOn:function(v){ S.on = !!v; },
-    state:function(){ return { triggers:S.triggers, locked:S.locked, pose:S.poseNow, lastDir:S.lastDir, on:S.on }; }
+    state:function(){ return { triggers:S.triggers, locked:S.locked, pose:S.poseNow, lastDir:S.lastDir, on:S.on, results:S.results, frameSeq:S.frameSeq }; }
   };
 })();
 </script>
