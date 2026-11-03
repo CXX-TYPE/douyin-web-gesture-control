@@ -88,30 +88,52 @@
   }
 
   // ---------- 动作 ----------
-  async function step(dir) {
-    var v = pickVideo(true);
-    var sc = scrollParent(v);
-    if (sc.scrollHeight - sc.clientHeight < 8) {
-      var alt = document.scrollingElement || document.documentElement;
-      if (alt !== sc) sc = alt;
-    }
-    var before = sc.scrollTop;
-    var h = sc.clientHeight || innerHeight;
-
-    sc.scrollBy({ top: dir * h, behavior: 'smooth' });
-    await sleep(450);
-    if (Math.abs(sc.scrollTop - before) > 8) return 'scroll';
-
-    // 回退：派发方向键（合成事件可能被忽略，所以放在第二顺位）
-    var key = dir > 0 ? 'ArrowDown' : 'ArrowUp';
-    var code = dir > 0 ? 40 : 38;
-    [document.activeElement, v, sc, document].forEach(function (t) {
-      if (t && t.dispatchEvent) {
-        t.dispatchEvent(new KeyboardEvent('keydown', { key: key, keyCode: code, which: code, bubbles: true, cancelable: true }));
-      }
+  function currentVideo() {
+    var vids = Array.prototype.slice.call(document.querySelectorAll('video'))
+      .filter(function (v) { return v.getBoundingClientRect().height > 100; });
+    var mid = innerHeight / 2, best = null, bestD = 1e9;
+    vids.forEach(function (v) {
+      var r = v.getBoundingClientRect();
+      var d = Math.abs((r.top + r.bottom) / 2 - mid);
+      if (d < bestD) { bestD = d; best = v; }
     });
-    await sleep(400);
-    if (Math.abs(sc.scrollTop - before) > 8) return 'keys';
+    return best;
+  }
+  function srcOf(v) { return v ? (v.currentSrc || v.src || '') : ''; }
+
+  // 抖音推荐流不用原生滚动（scrollTop 恒为 0，scrollBy 无效），
+  // 实际靠 wheel 事件驱动。实测：合成的 WheelEvent 就能生效，不需要可信事件。
+  async function step(dir) {
+    var before = srcOf(currentVideo());
+    var cx = Math.round(innerWidth / 2), cy = Math.round(innerHeight / 2);
+    var target = document.elementFromPoint(cx, cy) || document.body;
+    var dy = dir * Math.round(innerHeight * 0.9);
+
+    function wheel(amount) {
+      var e = new WheelEvent('wheel', {
+        deltaY: amount, deltaX: 0, deltaMode: 0,
+        bubbles: true, cancelable: true, clientX: cx, clientY: cy
+      });
+      target.dispatchEvent(e);
+    }
+
+    wheel(dy);
+    await sleep(900);
+    if (srcOf(currentVideo()) !== before) return 'wheel';
+
+    // 一次不够就分三次小步推，避免抖音的自定义滚动把手势当成"抖动"忽略
+    for (var i = 0; i < 3; i++) { wheel(dy / 3); await sleep(160); }
+    await sleep(700);
+    if (srcOf(currentVideo()) !== before) return 'wheel';
+
+    // 回退：原生滚动（老版本页面可能走这条）
+    var v = currentVideo();
+    var sc = scrollParent(v);
+    var top0 = sc.scrollTop;
+    sc.scrollBy({ top: dir * (sc.clientHeight || innerHeight), behavior: 'smooth' });
+    await sleep(600);
+    if (Math.abs(sc.scrollTop - top0) > 8) return 'scroll';
+
     return 'failed';
   }
 
@@ -135,9 +157,8 @@
   async function run(act) {
     if (act === 'next' || act === 'prev') {
       var how = await step(act === 'next' ? 1 : -1);
-      flash(how === 'scroll' ? (act === 'next' ? '下一个' : '上一个')
-            : how === 'keys' ? (act === 'next' ? '下一个（按键）' : '上一个（按键）')
-            : '切换失败', how === 'failed');
+      var ok = how !== 'failed';
+      flash(ok ? (act === 'next' ? '下一个' : '上一个') : '切换失败', !ok);
       return;
     }
     if (act === 'speed') { flash(cycleSpeed()); return; }
