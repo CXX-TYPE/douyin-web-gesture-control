@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{--bg:#0f1116;--panel:#171a21;--line:rgba(255,255,255,.12);--txt:#e7ebf3;--dim:#8b93a3;--cyan:#25f4ee;}
+  *{box-sizing:border-box;}
+  body{margin:0;width:288px;background:var(--bg);color:var(--txt);
+       font:13px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;}
+  .head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line);}
+  .head b{font-size:14px;font-weight:600;}
+  .dot{width:8px;height:8px;border-radius:50%;background:#5b6373;display:inline-block;margin-right:6px;}
+  .dot.on{background:var(--cyan);box-shadow:0 0 8px rgba(37,244,238,.8);}
+  .body{padding:14px 16px;}
+  .row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .switch{position:relative;width:46px;height:26px;border-radius:99px;background:#2a2f3a;cursor:pointer;transition:.18s;}
+  .switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.18s;}
+  .switch.on{background:rgba(37,244,238,.28);}
+  .switch.on::after{left:23px;background:var(--cyan);}
+  .list{border-top:1px solid var(--line);padding-top:10px;margin-top:4px;}
+  .item{display:flex;justify-content:space-between;padding:5px 0;font-size:12px;color:var(--dim);}
+  .item b{color:var(--txt);font-weight:500;}
+  .kbd{display:inline-block;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:10.5px;color:var(--dim);}
+  .foot{padding:10px 16px 14px;font-size:11px;color:#6f7787;border-top:1px solid var(--line);}
+  .warn{color:#ffb84d;font-size:11.5px;margin-top:8px;display:none;}
+  .warn.show{display:block;}
+</style>
+</head>
+<body>
+  <div class="head">
+    <b>抖音手势控制</b>
+    <span><i class="dot" id="dot"></i><span id="state">关</span></span>
+  </div>
+
+  <div class="body">
+    <div class="row">
+      <span>手势控制</span>
+      <div class="switch" id="sw"></div>
+    </div>
+
+    <div class="list">
+      <div class="item"><span>比 1</span><b>下一个</b></div>
+      <div class="item"><span>比 2</span><b>上一个</b></div>
+      <div class="item"><span>竖大拇指</span><b>快进 1×→2×→4×</b></div>
+      <div class="item"><span>五指张开</span><b>暂停 / 继续</b></div>
+    </div>
+
+    <div class="warn" id="warn">当前页面不是抖音，手势控制只在 douyin.com 生效。</div>
+  </div>
+
+  <div class="foot">
+    页内快捷键 <span class="kbd">Alt</span> + <span class="kbd">Shift</span> + <span class="kbd">G</span><br>
+    摄像头画面只在本地处理，不上传。
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
