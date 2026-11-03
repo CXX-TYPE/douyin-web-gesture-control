@@ -47,7 +47,7 @@
   function flash(text, warn) {
     setPill(true, text, warn);
     clearTimeout(flashTimer);
-    flashTimer = setTimeout(function () { setPill(enabled, enabled ? '手势 开' : '手势 关'); }, 1400);
+    flashTimer = setTimeout(function () { setPill(enabled, enabled ? '手势 开' : '手势 关'); }, 2400);
   }
 
   // ---------- 找目标元素 ----------
@@ -138,7 +138,7 @@
   }
 
   function cycleSpeed() {
-    var v = pickVideo(true) || pickVideo(false);
+    var v = currentVideo() || pickVideo(true) || pickVideo(false);
     if (!v) return '没有视频';
     var cur = v.playbackRate;
     var next = cur < 1.5 ? 2 : (cur < 3 ? 4 : 1);
@@ -147,7 +147,7 @@
   }
 
   function togglePause() {
-    var v = pickVideo(true) || pickVideo(false);
+    var v = currentVideo() || pickVideo(true) || pickVideo(false);
     if (!v) return '没有视频';
     if (v.paused) { v.play().catch(function () {}); return '继续播放'; }
     v.pause();
