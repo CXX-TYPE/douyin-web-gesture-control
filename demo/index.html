@@ -146,6 +146,19 @@
     body.gesture-on .rail{right:16px;bottom:300px;}
     body.gesture-on .card-info{right:110px;bottom:300px;}
   }
+
+  /* file:// 打开时的拦截提示 */
+  #fileWarn{position:absolute;inset:0;z-index:80;display:none;place-items:center;background:rgba(4,4,7,.92);backdrop-filter:blur(10px);padding:20px;}
+  #fileWarn.on{display:grid;}
+  .fw-card{width:min(94vw,520px);background:var(--panel-solid);border:1px solid rgba(254,44,85,.4);border-radius:18px;padding:26px 26px 22px;box-shadow:0 24px 70px rgba(0,0,0,.8);}
+  .fw-badge{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:#ff9db1;border:1px solid rgba(254,44,85,.45);background:rgba(254,44,85,.12);padding:3px 9px;border-radius:99px;margin-bottom:14px;}
+  .fw-title{font-size:19px;font-weight:600;margin-bottom:10px;letter-spacing:-.01em;}
+  .fw-p{font-size:12.5px;line-height:1.8;color:var(--muted);margin-bottom:12px;}
+  .fw-p b{color:var(--text);font-weight:600;}
+  .fw-code{display:block;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--cyan);background:rgba(37,244,238,.08);border:1px solid rgba(37,244,238,.25);border-radius:8px;padding:9px 12px;margin:8px 0 12px;user-select:all;}
+  .fw-steps{font-size:12.5px;line-height:1.9;color:var(--muted);padding-left:18px;margin-bottom:6px;}
+  .fw-steps li{margin-bottom:6px;}
+  .fw-url{color:var(--cyan);user-select:all;}
 </style>
 </head>
 <body>
@@ -250,6 +263,21 @@
 </div>
 
 <div id="toast"></div>
+
+<div id="fileWarn">
+  <div class="fw-card">
+    <div class="fw-badge">● 需要本地服务器</div>
+    <div class="fw-title">这个页面不能双击打开</div>
+    <div class="fw-p">你现在用的是 <b>file://</b> 协议，浏览器不允许这种页面加载 MediaPipe 的 WASM 识别模块，所以会报 <b>Invalid security origin</b>。这是浏览器的安全限制，改代码绕不过去。</div>
+    <div class="fw-p">两个办法，任选一个：</div>
+    <ol class="fw-steps">
+      <li>回到仓库目录，双击 <b>start-demo.bat</b>，它会自动起服务并打开浏览器</li>
+      <li>或者在仓库目录执行下面这行，然后访问 <span class="fw-url">http://127.0.0.1:8000/demo/</span></li>
+    </ol>
+    <code class="fw-code">python -m http.server 8000</code>
+    <div class="fw-p" style="margin-bottom:0;font-size:11.5px;color:var(--dim)">用 127.0.0.1 或 localhost 打开属于安全上下文，摄像头也能正常授权。</div>
+  </div>
+</div>
 
 <div id="onboard">
   <div class="ob-card">
@@ -751,6 +779,13 @@
   $('likeCount').textContent = ITEMS[0].likes;
   $('commentCount').textContent = ITEMS[0].comments;
   updateMetrics();
+
+  // file:// 下 MediaPipe 的 WASM 会抛 Invalid security origin，直接拦住并给指引
+  var isFile = location.protocol === 'file:';
+  if (isFile) {
+    $('fileWarn').classList.add('on');
+    return;
+  }
   if (!window.isSecureContext) {
     toast('当前不是安全上下文，摄像头会被浏览器拦截', true);
   }
