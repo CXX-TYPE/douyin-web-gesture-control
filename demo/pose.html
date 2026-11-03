@@ -75,6 +75,9 @@
   .dot-status.detect{background:var(--cyan);box-shadow:0 0 8px rgba(37,244,238,.8);}
   .dot-status.trigger{background:#5b8bff;box-shadow:0 0 10px rgba(91,139,255,.9);}
   .preview-cam{position:relative;background:#05060a;overflow:hidden;aspect-ratio:4/3;}
+  .hold-bar{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.09);}
+  .hold-bar i{display:block;height:100%;width:0;background:var(--cyan);transition:width .08s linear;}
+  .warn{color:#ffb84d !important;}
   #cam{width:100%;height:100%;display:block;transform:scaleX(-1);object-fit:cover;}
   #overlay{position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1);}
   .cam-hint{position:absolute;inset:0;display:grid;place-items:center;font-size:10.5px;color:var(--dim);text-align:center;padding:0 12px;line-height:1.6;}
@@ -204,6 +207,7 @@
   <div class="preview-cam">
     <video id="cam" playsinline muted></video>
     <canvas id="overlay" width="640" height="480"></canvas>
+    <div class="hold-bar"><i id="holdFill"></i></div>
     <div class="cam-hint" id="camHint">摄像头启动中…</div>
   </div>
   <div class="preview-foot">
@@ -414,12 +418,33 @@
   var CONN = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
               [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
 
+  // 安全区参考框：手超出这个虚线框，关键点会被画面边缘截断，判定就不可靠
+  function drawGuide(){
+    var W = overlay.width, H = overlay.height;
+    var mx = W * 0.10, my = H * 0.10;
+    octx.save();
+    octx.setLineDash([9, 9]);
+    octx.lineWidth = 2;
+    octx.strokeStyle = 'rgba(255,255,255,.20)';
+    octx.strokeRect(mx, my, W - mx * 2, H - my * 2);
+    octx.restore();
+  }
+
   function drawHand(lm){
     octx.clearRect(0, 0, overlay.width, overlay.height);
+    drawGuide();
     if (!lm) return;
     var W = overlay.width, H = overlay.height;
+
+    var minX = 1, maxX = 0, minY = 1, maxY = 0;
+    lm.forEach(function(q){
+      minX = Math.min(minX, q.x); maxX = Math.max(maxX, q.x);
+      minY = Math.min(minY, q.y); maxY = Math.max(maxY, q.y);
+    });
+    var out = minX < 0.015 || maxX > 0.985 || minY < 0.015 || maxY > 0.985;
+
     octx.lineWidth = 5;
-    octx.strokeStyle = 'rgba(37,244,238,.85)';
+    octx.strokeStyle = out ? 'rgba(255,184,77,.9)' : 'rgba(37,244,238,.85)';
     octx.lineCap = 'round';
     CONN.forEach(function(p){
       octx.beginPath();
@@ -427,7 +452,7 @@
       octx.lineTo(lm[p[1]].x * W, lm[p[1]].y * H);
       octx.stroke();
     });
-    octx.fillStyle = '#25f4ee';
+    octx.fillStyle = out ? '#ffb84d' : '#25f4ee';
     lm.forEach(function(p, i){
       octx.beginPath();
       octx.arc(p.x * W, p.y * H, i % 4 === 0 ? 6 : 4, 0, Math.PI * 2);
@@ -467,7 +492,17 @@
     ids.forEach(function(i){ cx += p[i].x; cy += p[i].y; });
     cx /= ids.length; cy /= ids.length;
 
-    return { pw:pw, cx:cx, cy:cy, ext:ext, ratio:ratio, pose:pose, dir:dir, faceRatio:faceRatio };
+    // 出框检测：手贴边时关键点会被截断，掌宽会被算小，
+    // 归一化后的位移/指长全都会被放大——这是误触的主要来源之一
+    var minX = 1, maxX = 0, minY = 1, maxY = 0;
+    lm.forEach(function(q){
+      minX = Math.min(minX, q.x); maxX = Math.max(maxX, q.x);
+      minY = Math.min(minY, q.y); maxY = Math.max(maxY, q.y);
+    });
+    var edge = minX < 0.015 || maxX > 0.985 || minY < 0.015 || maxY > 0.985;
+
+    return { pw:pw, cx:cx, cy:cy, ext:ext, ratio:ratio, pose:pose, dir:dir,
+             faceRatio:faceRatio, edge:edge, box:[minX, minY, maxX, maxY] };
   }
 
   function step(dir){
@@ -526,6 +561,8 @@
       S.poseNow = 0; S.poseSince = 0; S.locked = false; S.lastDir = 0;
       setChip('c1', false); setChip('c2', false); setChip('c3', false); setChip('c4', false);
       $('nFingers').textContent = '--'; $('nHold').textContent = '--'; $('nLock').textContent = '--';
+      handState.className = '';
+      if ($('holdFill')) $('holdFill').style.width = '0%';
       if (S.on && now - S.lastFire > 700) setStatus('ready');
       return;
     }
@@ -546,8 +583,12 @@
       else if (S.poseNow !== S.lastDir && now - S.lastFire > 350) S.locked = false;
     }
 
+    // 几何有效性：手不出框、且手掌在画面里够大（pw 是像素单位，<22px 说明离太远）
+    var geoOk = !e.edge && e.pw >= 22;
+    var hint = e.edge ? '手太靠边 · 往中间挪' : (e.pw < 22 ? '离镜头近一点' : '');
+
     var c2 = e.dir !== 0;
-    var c3 = !S.locked && (now - S.lastFire >= P.cool);
+    var c3 = geoOk && !S.locked && (now - S.lastFire >= P.cool);
     var c4 = held >= P.hold;
 
     if (now - S.lastUI > 70) {
@@ -558,7 +599,17 @@
       $('nHold').textContent = Math.round(held) + ' / ' + P.hold + 'ms';
       $('nLock').textContent = S.locked ? '是' : '否';
       pipeTimer.textContent = Math.round(held) + ' / ' + P.hold + 'ms';
-      handState.textContent = S.locked ? '已触发 · 收手或换手势' : (e.pose ? ('已识别 · 比 ' + e.pose) : '已检测到手');
+      handState.textContent = S.locked ? '已触发 · 收手或换手势'
+        : (hint ? hint : (e.pose ? ('已识别 · 比 ' + e.pose) : '已检测到手'));
+      handState.className = hint && !S.locked ? 'warn' : '';
+
+      // 保持进度：让"还差多少"看得见，不用盯着数字算
+      var pct = S.locked ? 100 : (S.poseNow && geoOk ? Math.min(100, held / P.hold * 100) : 0);
+      var fill = $('holdFill');
+      if (fill) {
+        fill.style.width = pct + '%';
+        fill.style.background = S.locked ? 'rgba(255,255,255,.28)' : (hint ? '#ffb84d' : 'var(--cyan)');
+      }
       if (!S.locked && now - S.lastFire > 700) setStatus('detect');
     }
 
@@ -677,6 +728,8 @@
     setChip('c1', false); setChip('c2', false); setChip('c3', false); setChip('c4', false);
     $('nFingers').textContent = '--'; $('nFace').textContent = '--';
     $('nHold').textContent = '--'; $('nLock').textContent = '--';
+    if ($('holdFill')) $('holdFill').style.width = '0%';
+    handState.className = '';
     $('mFps').textContent = '-- fps';
     updateMetrics();
     toast('已关闭，摄像头已释放（指示灯应已熄灭）');
