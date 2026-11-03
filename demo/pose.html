@@ -134,6 +134,22 @@
   .test-btns button{flex:1;padding:7px 4px;border-radius:7px;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--text);font-size:10.5px;font-family:inherit;transition:.18s;}
   .test-btns button:hover{background:rgba(37,244,238,.12);border-color:rgba(37,244,238,.3);color:var(--cyan);}
   .kbd-hint{font-size:9.5px;color:var(--dim);line-height:1.7;}
+  /* 快捷开关：常驻右上角，一键开关，不用每次走引导 */
+  .quick{
+    position:fixed;top:14px;right:16px;z-index:45;
+    display:flex;align-items:center;gap:8px;
+    padding:7px 12px;border-radius:99px;
+    border:1px solid var(--line-strong);background:rgba(10,12,16,.78);
+    backdrop-filter:blur(14px);box-shadow:0 6px 20px rgba(0,0,0,.35);
+    font-size:12px;color:var(--muted);cursor:pointer;user-select:none;
+    transition:color .18s,border-color .18s,transform .12s;
+  }
+  .quick:hover{border-color:rgba(255,255,255,.28);}
+  .quick:active{transform:scale(.97);}
+  .quick.on{color:#25f4ee;border-color:rgba(37,244,238,.5);}
+  .quick .q-dot{width:7px;height:7px;border-radius:50%;background:#5b6373;transition:.18s;}
+  .quick.on .q-dot{background:#25f4ee;box-shadow:0 0 9px rgba(37,244,238,.85);}
+  .quick kbd{font-size:9.5px;color:var(--dim);border:1px solid var(--line);border-radius:4px;padding:1px 5px;letter-spacing:.02em;}
   kbd{background:rgba(255,255,255,.08);border:1px solid var(--line);border-radius:4px;padding:1px 4px;font-size:9.5px;font-family:inherit;}
 
   #onboard{position:absolute;inset:0;z-index:60;display:grid;place-items:center;background:rgba(4,4,7,.75);backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:.3s;}
@@ -184,6 +200,12 @@
 <body>
 
 <div id="feed"></div>
+
+<div class="quick" id="quick" title="开关手势控制（Alt+Shift+G）">
+  <span class="q-dot" id="qDot"></span>
+  <span id="qLabel">手势 关</span>
+  <kbd>Alt ⇧ G</kbd>
+</div>
 
 <div class="player-badge" id="speedBadge">1×</div>
 <div class="pause-veil" id="pauseVeil">
@@ -283,7 +305,7 @@
     <div class="test-btns">
       <button id="btnLoose">识别不到？一键放宽阈值</button>
     </div>
-    <div class="kbd-hint"><kbd>↑</kbd> <kbd>↓</kbd> 模拟触发　<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> 开关　点击预览窗可放大</div>
+    <div class="kbd-hint"><kbd>↑</kbd> <kbd>↓</kbd> 模拟触发　<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> 快捷开关　点击预览窗可放大</div>
   </div>
 </div>
 
@@ -795,6 +817,8 @@
       camHint.textContent = '';
       S.on = true;
       S.lastFire = 0;
+      lsSet(LS_AUTO, '1');
+      syncQuick();
       S.poseNow = 0; S.poseSince = 0; S.locked = false; S.lastPose = 0;
       toast('已开启 · 手背朝镜头，比 1 或 2');
       stResult.textContent = '手背朝镜头，比 1 或 2';
@@ -820,6 +844,8 @@
   function disable(){
     S.on = false;
     S.running = false;
+    lsSet(LS_AUTO, '0');
+    syncQuick();
     clearInterval(S.fpsTimer);
     S.handSeen = false;
     S.poseNow = 0; S.poseSince = 0; S.locked = false; S.lastPose = 0;
@@ -844,7 +870,26 @@
     toast('已关闭，摄像头已释放（指示灯应已熄灭）');
   }
 
-  function toggle(){ if (S.on) disable(); else openOnboard(); }
+  // ---------- 快捷开关 ----------
+  var quick = $('quick'), qLabel = $('qLabel');
+  var LS_SEEN = 'dyGesture.seenOnboard', LS_AUTO = 'dyGesture.autoOn';
+
+  function lsGet(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v){ try { localStorage.setItem(k, v); } catch (e) {} }
+  function markSeen(){ lsSet(LS_SEEN, '1'); }
+
+  function syncQuick(){
+    quick.classList.toggle('on', !!S.on);
+    qLabel.textContent = S.on ? '手势 开' : '手势 关';
+  }
+
+  // 看过一次引导之后，快捷开关直接开关，不再弹三步引导
+  function toggle(){
+    if (S.on) { disable(); return; }
+    if (lsGet(LS_SEEN) === '1') enable(); else openOnboard();
+  }
+
+  quick.addEventListener('click', toggle);
 
   var obIdx = 0;
   var obBodies = [$('obBody1'), $('obBody2'), $('obBody3')];
@@ -869,9 +914,9 @@
 
   $('obNext').addEventListener('click', function(){
     if (obIdx < 2) { obIdx++; renderOb(); }
-    else { onboard.classList.remove('show'); enable(); }
+    else { markSeen(); onboard.classList.remove('show'); enable(); }
   });
-  $('obSkip').addEventListener('click', function(){ onboard.classList.remove('show'); enable(); });
+  $('obSkip').addEventListener('click', function(){ markSeen(); onboard.classList.remove('show'); enable(); });
 
   fab.addEventListener('click', toggle);
   $('previewHead').addEventListener('click', function(){
@@ -947,7 +992,13 @@
   if (!window.isSecureContext) {
     toast('当前不是安全上下文，摄像头会被浏览器拦截', true);
   }
-  setTimeout(function(){ toast('点右下角手势按钮，授权摄像头'); }, 600);
+  syncQuick();
+  // 上次退出时是开启的，就自动恢复；权限已在浏览器里记住，不会重复询问
+  if (lsGet(LS_AUTO) === '1' && lsGet(LS_SEEN) === '1') {
+    setTimeout(function(){ if (!S.on && !S.starting) enable(); }, 500);
+  } else {
+    setTimeout(function(){ toast('右上角快捷开关，或按 Alt+Shift+G'); }, 600);
+  }
 
   window.DEMO = {
     enable:enable, disable:disable, sim:sim, step:step, params:P,
