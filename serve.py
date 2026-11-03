@@ -41,11 +41,12 @@ def main():
         webbrowser.open(URL)
         return
 
-    print("=" * 52)
-    print(f"  演示地址：{URL}")
-    print(f"  根目录：  {ROOT}")
-    print("  关闭窗口或按 Ctrl+C 结束")
-    print("=" * 52)
+    # flush=True：输出被重定向时 Python 默认块缓冲，不加会看不到横幅
+    print("=" * 52, flush=True)
+    print(f"  演示地址：{URL}", flush=True)
+    print(f"  根目录：  {ROOT}", flush=True)
+    print("  关闭窗口或按 Ctrl+C 结束", flush=True)
+    print("=" * 52, flush=True)
 
     threading.Timer(1.0, open_browser).start()
     try:
