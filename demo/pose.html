@@ -291,12 +291,12 @@
       <div class="gesture-list">
         <div class="gesture-item">
           <svg viewBox="0 0 40 44"><path d="M13 40c0-7 1-13 1-19V10a2.6 2.6 0 0 1 5.2 0v12"/><path d="M19.2 22v-1a2.6 2.6 0 0 1 5.2 0v6"/><path d="M24.4 27v-3a2.6 2.6 0 0 1 5.2 0v8c0 5-3 8-7 8h-2c-4 0-7-2-7.6-5"/></svg>
-          <div><div class="g-name">比 1（只伸食指）</div><div class="g-desc">→ 上一个视频</div></div>
+          <div><div class="g-name">比 1（只伸食指）</div><div class="g-desc">→ 下一个视频</div></div>
           <span class="g-key">1</span>
         </div>
         <div class="gesture-item">
           <svg viewBox="0 0 40 44"><path d="M11 40c0-7 1-13 1-19V10a2.6 2.6 0 0 1 5.2 0v12"/><path d="M17.2 22V9a2.6 2.6 0 0 1 5.2 0v13"/><path d="M22.4 25v-6a2.6 2.6 0 0 1 5.2 0v12c0 5-3 9-8 9h-1c-4 0-7-2-7.6-5"/></svg>
-          <div><div class="g-name">比 2（食指+中指）</div><div class="g-desc">→ 下一个视频</div></div>
+          <div><div class="g-name">比 2（食指+中指）</div><div class="g-desc">→ 上一个视频</div></div>
           <span class="g-key">2</span>
         </div>
       </div>
@@ -460,7 +460,7 @@
     });
   }
 
-  // 静态手势判定：比 1 → 上一个，比 2 → 下一个
+  // 静态手势判定：比 1 → 下一个，比 2 → 上一个
   // 只看两件事：哪几根手指伸着、手掌平面是否正对镜头。不看位移，所以不怕快慢。
   function evaluate(lm, W, H){
     // MediaPipe 给的是归一化坐标，先换算到像素尺度，否则角度/距离会被画面比例拉伸
@@ -478,8 +478,8 @@
     var ext = ratio.map(function(r){ return r > P.curl; });
 
     var pose = 0, dir = 0;
-    if (ext[0] && !ext[1] && !ext[2] && !ext[3]) { pose = 1; dir = -1; }        // 只伸食指 → 上一个
-    else if (ext[0] && ext[1] && !ext[2] && !ext[3]) { pose = 2; dir = 1; }      // 伸食指+中指 → 下一个
+    if (ext[0] && !ext[1] && !ext[2] && !ext[3]) { pose = 1; dir = 1; }          // 只伸食指 → 下一个
+    else if (ext[0] && ext[1] && !ext[2] && !ext[3]) { pose = 2; dir = -1; }     // 伸食指+中指 → 上一个
 
     // 朝向：掌面法向量的 z 分量占比。正对镜头接近 1，侧对镜头接近 0。
     var ax = p[5].x - p[0].x, ay = p[5].y - p[0].y, az = p[5].z - p[0].z;
@@ -526,7 +526,7 @@
     if (S.latencies.length > 12) S.latencies.shift();
 
     latencyFoot.textContent = latency + ' ms';
-    stResult.textContent = (dir > 0 ? '比 2 · 下一个' : '比 1 · 上一个');
+    stResult.textContent = (dir > 0 ? '比 1 · 下一个' : '比 2 · 上一个');
     stMs.textContent = latency + ' ms';
     setStatus('trigger');
     step(dir);
@@ -777,7 +777,7 @@
     var texts = [
       '用比数字代替滑屏。静态手势不看速度、不看方向，比一下就能切。画面只在本地处理，不上传。',
       '点「允许」后，浏览器会请求摄像头。授权一次即可，之后不再询问。',
-      '距离约 40–60cm，光线从正面来。手背朝镜头，比 1 切上一个，比 2 切下一个，保持 0.3 秒即可。'
+      '距离约 40–60cm，光线从正面来。手背朝镜头，比 1 切下一个，比 2 切上一个，保持 0.3 秒即可。'
     ];
     $('obTitle').textContent = titles[obIdx];
     $('obText').textContent = texts[obIdx];
