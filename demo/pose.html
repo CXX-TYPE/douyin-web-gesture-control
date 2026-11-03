@@ -35,7 +35,22 @@
   .card-music{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:10px;}
   .progress{position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(255,255,255,.14);}
   .progress i{display:block;height:100%;width:0;background:rgba(255,255,255,.55);}
-  .card.active .progress i{animation:play 18s linear forwards;}
+  /* 进度由 JS 驱动，才能受倍速与暂停控制（CSS animation 改不了倍速） */
+  .player-badge{
+    position:absolute;top:64px;right:20px;z-index:9;font-size:12px;color:var(--muted);
+    border:1px solid var(--line);background:rgba(0,0,0,.38);padding:3px 10px;border-radius:99px;
+    font-variant-numeric:tabular-nums;opacity:.5;transition:.18s;
+  }
+  .player-badge.on{color:#25f4ee;border-color:rgba(37,244,238,.5);opacity:1;}
+  .pause-veil{
+    position:absolute;inset:0;z-index:4;display:none;place-items:center;
+    background:rgba(0,0,0,.5);backdrop-filter:blur(3px);pointer-events:none;
+  }
+  .pause-veil.on{display:grid;}
+  .pv{display:grid;place-items:center;gap:16px;}
+  .pv-bars{display:flex;gap:11px;}
+  .pv-bars i{width:13px;height:56px;background:#fff;border-radius:3px;opacity:.92;}
+  .pv em{font-style:normal;font-size:13px;color:#fff;opacity:.82;letter-spacing:.06em;}
   @keyframes play{from{width:0}to{width:100%}}
 
   .rail{position:absolute;right:16px;bottom:150px;display:flex;flex-direction:column;align-items:center;gap:20px;z-index:5;transition:right .3s cubic-bezier(.2,.8,.3,1);}
@@ -170,6 +185,14 @@
 
 <div id="feed"></div>
 
+<div class="player-badge" id="speedBadge">1×</div>
+<div class="pause-veil" id="pauseVeil">
+  <div class="pv">
+    <span class="pv-bars"><i></i><i></i></span>
+    <em>已暂停 · 比五指继续</em>
+  </div>
+</div>
+
 <div class="topbar"><b class="on">推荐</b><b>关注</b><b>朋友</b><b>我的</b></div>
 
 <div class="rail">
@@ -218,7 +241,7 @@
     <div class="st-title"><span>识别状态</span><span id="pipeTimer">--</span></div>
     <div class="st-chips">
       <div class="chip" data-id="c1"><b>C1</b>单手可见</div>
-      <div class="chip" data-id="c2"><b>C2</b>比出 1/2</div>
+      <div class="chip" data-id="c2"><b>C2</b>手势命中</div>
       <div class="chip" data-id="c3"><b>C3</b>可触发</div>
       <div class="chip" data-id="c4"><b>C4</b>保持达标</div>
     </div>
@@ -298,6 +321,16 @@
           <svg viewBox="0 0 40 44"><path d="M11 40c0-7 1-13 1-19V10a2.6 2.6 0 0 1 5.2 0v12"/><path d="M17.2 22V9a2.6 2.6 0 0 1 5.2 0v13"/><path d="M22.4 25v-6a2.6 2.6 0 0 1 5.2 0v12c0 5-3 9-8 9h-1c-4 0-7-2-7.6-5"/></svg>
           <div><div class="g-name">比 2（食指+中指）</div><div class="g-desc">→ 上一个视频</div></div>
           <span class="g-key">2</span>
+        </div>
+        <div class="gesture-item">
+          <svg viewBox="0 0 40 44"><path d="M15 40c0-6 1-10 1-14V14a3 3 0 0 1 6 0v9"/><path d="M22 23v-2a2.6 2.6 0 0 1 5.2 0v6"/><path d="M27.2 27v-3a2.6 2.6 0 0 1 5.2 0v9c0 4-3 7-7 7h-3c-4 0-7-2-7.5-5"/></svg>
+          <div><div class="g-name">竖大拇指</div><div class="g-desc">→ 快进（1× → 2× → 4×）</div></div>
+          <span class="g-key">▶▶</span>
+        </div>
+        <div class="gesture-item">
+          <svg viewBox="0 0 40 44"><path d="M8 40c0-6 1-10 1-14V12a2.4 2.4 0 0 1 4.8 0v10"/><path d="M13.8 22V9a2.4 2.4 0 0 1 4.8 0v13"/><path d="M18.6 22V7a2.4 2.4 0 0 1 4.8 0v15"/><path d="M23.4 22V10a2.4 2.4 0 0 1 4.8 0v18c0 6-4 12-10 12h-2c-5 0-8-3-8.4-7"/></svg>
+          <div><div class="g-name">五指张开</div><div class="g-desc">→ 暂停 / 继续</div></div>
+          <span class="g-key">⏸</span>
         </div>
       </div>
     </div>
@@ -385,7 +418,7 @@
     on:false, starting:false, stream:null, hands:null, running:false,
     lastFire:0, triggers:0, latencies:[], fps:0,
     frames:0, fpsT0:0, busy:false, lastUI:0, handSeen:false,
-    poseNow:0, poseSince:0, locked:false, lastDir:0, frameSeq:0, lastSentSeq:-1, fpsTimer:null, rvfcOn:false, results:0
+    poseNow:0, poseSince:0, locked:false, lastPose:0, frameSeq:0, lastSentSeq:-1, fpsTimer:null, rvfcOn:false, results:0
   };
   var current = 0;
 
@@ -477,9 +510,17 @@
     });
     var ext = ratio.map(function(r){ return r > P.curl; });
 
-    var pose = 0, dir = 0;
-    if (ext[0] && !ext[1] && !ext[2] && !ext[3]) { pose = 1; dir = 1; }          // 只伸食指 → 下一个
-    else if (ext[0] && ext[1] && !ext[2] && !ext[3]) { pose = 2; dir = -1; }     // 伸食指+中指 → 上一个
+    // 拇指是否伸开：指尖(4) 离食指根(5) 足够远，说明没压在掌心里
+    var thumbExt = dist(p[4], p[5]) / pw > 0.45;
+    // 张开程度：相邻指尖的最大间距，用来区分「五指张开」和「五指并拢的平掌」
+    var gaps = [dist(p[8], p[12]), dist(p[12], p[16]), dist(p[16], p[20])].map(function(d){ return d / pw; });
+    var spread = (gaps[0] + gaps[1] + gaps[2]) / 3;   // 取平均，避免某一根手指抖动就把"张开"判错
+
+    var pose = 0, act = '';
+    if (ext[0] && !ext[1] && !ext[2] && !ext[3]) { pose = 1; act = 'next'; }              // 比 1 → 下一个
+    else if (ext[0] && ext[1] && !ext[2] && !ext[3]) { pose = 2; act = 'prev'; }          // 比 2 → 上一个
+    else if (thumbExt && !ext[0] && !ext[1] && !ext[2] && !ext[3]) { pose = 3; act = 'speed'; }  // 竖拇指 → 快进
+    else if (ext[0] && ext[1] && ext[2] && ext[3] && spread > 0.28) { pose = 4; act = 'pause'; } // 五指张开 → 暂停
 
     // 朝向：掌面法向量的 z 分量占比。正对镜头接近 1，侧对镜头接近 0。
     var ax = p[5].x - p[0].x, ay = p[5].y - p[0].y, az = p[5].z - p[0].z;
@@ -501,9 +542,41 @@
     });
     var edge = minX < 0.015 || maxX > 0.985 || minY < 0.015 || maxY > 0.985;
 
-    return { pw:pw, cx:cx, cy:cy, ext:ext, ratio:ratio, pose:pose, dir:dir,
+    return { pw:pw, cx:cx, cy:cy, ext:ext, ratio:ratio, pose:pose, act:act,
+             thumbExt:thumbExt, spread:spread,
              faceRatio:faceRatio, edge:edge, box:[minX, minY, maxX, maxY] };
   }
+
+  // ---------- 播放器：倍速与暂停 ----------
+  var player = { t:0, dur:18, speed:1, paused:false };
+  var speedBadge = $('speedBadge'), pauseVeil = $('pauseVeil');
+
+  function renderProgress(){
+    var card = cards[current];
+    if (!card) return;
+    var bar = card.querySelector('.progress i');
+    if (bar) bar.style.width = Math.min(100, player.t / player.dur * 100) + '%';
+  }
+  function syncBadge(){
+    speedBadge.textContent = player.speed + '×';
+    speedBadge.className = 'player-badge' + (player.speed > 1 ? ' on' : '');
+  }
+  function cycleSpeed(){
+    player.speed = player.speed === 1 ? 2 : (player.speed === 2 ? 4 : 1);
+    syncBadge();
+    toast(player.speed === 1 ? '恢复 1 倍速' : ('快进 · ' + player.speed + ' 倍速'));
+  }
+  function togglePause(){
+    player.paused = !player.paused;
+    pauseVeil.classList.toggle('on', player.paused);
+    toast(player.paused ? '已暂停 · 比五指继续' : '继续播放');
+  }
+  setInterval(function(){
+    if (player.paused) return;
+    player.t += 0.2 * player.speed;
+    if (player.t >= player.dur) player.t = 0;
+    renderProgress();
+  }, 200);
 
   function step(dir){
     var next = current + dir;
@@ -514,23 +587,28 @@
     return true;
   }
 
-  function fire(dir, latency){
+  function fire(act, latency){
     var now = performance.now();
     if (now - S.lastFire < P.cool) return false;
     S.lastFire = now;
-    S.lastDir = dir;
+    S.lastPose = S.poseNow;
     S.locked = true;          // 触发后锁定，必须收手或换成另一个手势才能再触发
     S.poseSince = now;
     S.triggers++;
     S.latencies.push(latency);
     if (S.latencies.length > 12) S.latencies.shift();
 
+    var label = { next:'比 1 · 下一个', prev:'比 2 · 上一个', speed:'竖拇指 · 快进', pause:'五指张开 · 暂停' }[act] || act;
     latencyFoot.textContent = latency + ' ms';
-    stResult.textContent = (dir > 0 ? '比 1 · 下一个' : '比 2 · 上一个');
+    stResult.textContent = label;
     stMs.textContent = latency + ' ms';
     setStatus('trigger');
-    step(dir);
-    toast((dir > 0 ? '下一个视频' : '上一个视频') + ' · ' + latency + 'ms');
+
+    if (act === 'next') { step(1); toast('下一个视频 · ' + latency + 'ms'); }
+    else if (act === 'prev') { step(-1); toast('上一个视频 · ' + latency + 'ms'); }
+    else if (act === 'speed') cycleSpeed();
+    else if (act === 'pause') togglePause();
+
     updateMetrics();
     return true;
   }
@@ -552,7 +630,7 @@
     if (!lm) {
       camHint.style.display = 'none';
       handState.textContent = '未检测到手';
-      S.poseNow = 0; S.poseSince = 0; S.locked = false; S.lastDir = 0;
+      S.poseNow = 0; S.poseSince = 0; S.locked = false; S.lastPose = 0;
       setChip('c1', false); setChip('c2', false); setChip('c3', false); setChip('c4', false);
       $('nFingers').textContent = '--'; $('nHold').textContent = '--'; $('nLock').textContent = '--';
       handState.className = '';
@@ -567,35 +645,36 @@
     var e = evaluate(lm, W, H);
 
     // 指型一变就重新计时，避免"手停在那儿"被误当成一次新的保持
-    if (e.dir !== S.poseNow) { S.poseNow = e.dir; S.poseSince = now; }
+    if (e.pose !== S.poseNow) { S.poseNow = e.pose; S.poseSince = now; }
     var held = S.poseNow ? (now - S.poseSince) : 0;
 
     // 解锁：收成非 1/2 的手型，或换成另一个数字。
     // 这一条专治"下滑后收手回弹又触发上滑"——同一姿势连续保持不会重复生效。
     if (S.locked) {
       if (S.poseNow === 0) S.locked = false;
-      else if (S.poseNow !== S.lastDir && now - S.lastFire > 350) S.locked = false;
+      else if (S.poseNow !== S.lastPose && now - S.lastFire > 350) S.locked = false;
     }
 
     // 几何有效性：手不出框、且手掌在画面里够大（pw 是像素单位，<22px 说明离太远）
     var geoOk = !e.edge && e.pw >= 22;
     var hint = e.edge ? '手太靠边 · 往中间挪' : (e.pw < 22 ? '离镜头近一点' : '');
 
-    var c2 = e.dir !== 0;
+    var c2 = e.pose !== 0;
     var c3 = geoOk && !S.locked && (now - S.lastFire >= P.cool);
     var c4 = held >= P.hold;
 
     if (now - S.lastUI > 70) {
       S.lastUI = now;
       setChip('c1', true); setChip('c2', c2); setChip('c3', c3); setChip('c4', c4);
-      $('nFingers').textContent = e.pose ? ('比 ' + e.pose) : (e.ext.filter(Boolean).length + ' 指');
+      var poseName = {1:'比 1', 2:'比 2', 3:'竖拇指', 4:'五指张开'}[e.pose];
+      $('nFingers').textContent = poseName || (e.ext.filter(Boolean).length + ' 指');
       $('nFace').textContent = e.faceRatio.toFixed(2) + (e.faceRatio > 0.55 ? ' 正对' : ' 侧对');
       // 锁定后不再往上累加，否则会出现「保持 6004 / 300ms」这种看着像 bug 的数字
       $('nHold').textContent = S.locked ? '已触发' : (Math.round(held) + ' / ' + P.hold + 'ms');
       $('nLock').textContent = S.locked ? '是' : '否';
       pipeTimer.textContent = S.locked ? '已触发' : (Math.round(held) + ' / ' + P.hold + 'ms');
       handState.textContent = S.locked ? '已触发 · 收手或换手势'
-        : (hint ? hint : (e.pose ? ('已识别 · 比 ' + e.pose) : '已检测到手'));
+        : (hint ? hint : (poseName ? ('已识别 · ' + poseName) : '已检测到手'));
       handState.className = hint && !S.locked ? 'warn' : '';
 
       // 保持进度：让"还差多少"看得见，不用盯着数字算
@@ -608,7 +687,7 @@
       if (!S.locked && now - S.lastFire > 700) setStatus('detect');
     }
 
-    if (S.on && c2 && c3 && c4) fire(e.dir, Math.round(held + 50));
+    if (S.on && c2 && c3 && c4) fire(e.act, Math.round(held + 50));
   }
 
   async function startCamera(){
@@ -716,7 +795,7 @@
       camHint.textContent = '';
       S.on = true;
       S.lastFire = 0;
-      S.poseNow = 0; S.poseSince = 0; S.locked = false; S.lastDir = 0;
+      S.poseNow = 0; S.poseSince = 0; S.locked = false; S.lastPose = 0;
       toast('已开启 · 手背朝镜头，比 1 或 2');
       stResult.textContent = '手背朝镜头，比 1 或 2';
       updateMetrics();
@@ -743,7 +822,7 @@
     S.running = false;
     clearInterval(S.fpsTimer);
     S.handSeen = false;
-    S.poseNow = 0; S.poseSince = 0; S.locked = false; S.lastDir = 0;
+    S.poseNow = 0; S.poseSince = 0; S.locked = false; S.lastPose = 0;
     stopCamera();
     fab.classList.remove('on');
     document.body.classList.remove('gesture-on');
@@ -777,7 +856,7 @@
     var texts = [
       '用比数字代替滑屏。静态手势不看速度、不看方向，比一下就能切。画面只在本地处理，不上传。',
       '点「允许」后，浏览器会请求摄像头。授权一次即可，之后不再询问。',
-      '距离约 40–60cm，光线从正面来。手背朝镜头，比 1 切下一个，比 2 切上一个，保持 0.3 秒即可。'
+      '距离约 40–60cm，光线从正面来。四个手势：比 1 下一个、比 2 上一个、竖拇指快进、五指张开暂停。都比手背朝镜头，保持 0.3 秒。'
     ];
     $('obTitle').textContent = titles[obIdx];
     $('obText').textContent = texts[obIdx];
@@ -814,7 +893,7 @@
 
   function sim(dir){
     if (!S.on) { toast('先开启手势控制'); return; }
-    fire(dir, 180 + Math.round(Math.random() * 60));
+    fire(dir > 0 ? 'next' : 'prev', 180 + Math.round(Math.random() * 60));
   }
   $('btnSimUp').addEventListener('click', function(){ sim(1); });
   $('btnSimDown').addEventListener('click', function(){ sim(-1); });
@@ -851,8 +930,10 @@
     $('likeCount').textContent = item.likes;
     $('commentCount').textContent = item.comments;
     document.querySelector('.rail .avatar').textContent = item.author.charAt(0);
+    if (idx !== lastIdx) { lastIdx = idx; player.t = 0; renderProgress(); }
   }, { passive:true });
 
+  var lastIdx = 0;
   $('likeCount').textContent = ITEMS[0].likes;
   $('commentCount').textContent = ITEMS[0].comments;
   updateMetrics();
@@ -877,7 +958,7 @@
     feed:function(lm){ onResults({ multiHandLandmarks: lm ? [lm] : [] }); },
     // 测试用：跳过摄像头直接置位运行态，避免真实帧与合成帧互相干扰
     forceOn:function(v){ S.on = !!v; },
-    state:function(){ return { triggers:S.triggers, locked:S.locked, pose:S.poseNow, lastDir:S.lastDir, on:S.on, results:S.results, frameSeq:S.frameSeq }; }
+    state:function(){ return { triggers:S.triggers, locked:S.locked, pose:S.poseNow, lastPose:S.lastPose, on:S.on, speed:player.speed, paused:player.paused, results:S.results, frameSeq:S.frameSeq }; }
   };
 })();
 </script>
