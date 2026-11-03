@@ -3,344 +3,148 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>抖音手势控制器 · 交互演示</title>
+<title>抖音手势控制器 · 真实识别演示</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   :root{
-    --bg:#0a0a0d;
-    --panel:rgba(18,18,24,.86);
-    --panel-solid:#15151c;
-    --line:rgba(255,255,255,.10);
-    --line-strong:rgba(255,255,255,.18);
-    --text:#f4f4f7;
-    --muted:#8e8e9c;
-    --dim:#5c5c6a;
-    --cyan:#25f4ee;
-    --red:#fe2c55;
-    --green:#3ddc84;
-    --amber:#ffb84d;
-    --r-md:10px;
-    --r-lg:14px;
-    --shadow:0 12px 40px rgba(0,0,0,.55);
+    --bg:#0a0a0d; --panel:rgba(18,18,24,.88); --panel-solid:#15151c;
+    --line:rgba(255,255,255,.10); --line-strong:rgba(255,255,255,.20);
+    --text:#f4f4f7; --muted:#8e8e9c; --dim:#5c5c6a;
+    --cyan:#25f4ee; --red:#fe2c55; --green:#3ddc84; --amber:#ffb84d;
+    --r-lg:14px; --shadow:0 12px 40px rgba(0,0,0,.55);
   }
   html,body{height:100%;}
-  body{
-    background:var(--bg); color:var(--text);
-    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
-    overflow:hidden; user-select:none;
-  }
+  body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden;user-select:none;}
 
-  /* ============ 视频流 ============ */
-  #feed{
-    position:absolute; inset:0;
-    overflow-y:scroll; scroll-snap-type:y mandatory;
-    scrollbar-width:none;
-  }
+  #feed{position:absolute;inset:0;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;}
   #feed::-webkit-scrollbar{display:none;}
-
-  .card{
-    position:relative; width:100%; height:100%;
-    scroll-snap-align:start; scroll-snap-stop:always;
-    overflow:hidden;
-  }
-  .card-bg{position:absolute; inset:0; animation:drift 24s ease-in-out infinite alternate;}
+  .card{position:relative;width:100%;height:100%;scroll-snap-align:start;scroll-snap-stop:always;overflow:hidden;}
+  .card-bg{position:absolute;inset:0;animation:drift 24s ease-in-out infinite alternate;}
   @keyframes drift{from{transform:scale(1.02)}to{transform:scale(1.10)}}
-  .card-scrim{
-    position:absolute; inset:0;
-    background:linear-gradient(to top, rgba(0,0,0,.72) 0%, rgba(0,0,0,.18) 34%, rgba(0,0,0,0) 58%, rgba(0,0,0,.35) 100%);
-  }
-  .card-index{
-    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-    font-size:clamp(64px,16vw,150px); font-weight:800; letter-spacing:-.04em;
-    color:rgba(255,255,255,.10); pointer-events:none; white-space:nowrap;
-  }
+  .card-scrim{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.74) 0%,rgba(0,0,0,.2) 34%,rgba(0,0,0,0) 58%,rgba(0,0,0,.35) 100%);}
+  .card-index{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:clamp(64px,16vw,150px);font-weight:800;letter-spacing:-.04em;color:rgba(255,255,255,.10);pointer-events:none;white-space:nowrap;}
 
-  /* 底部信息 */
-  .card-info{position:absolute; left:20px; right:110px; bottom:130px; transition:right .3s;}
-  body.gesture-on .card-info{right:264px;}
-  .card-author{display:flex; align-items:center; gap:8px; font-size:15px; font-weight:600; margin-bottom:8px;}
+  .card-info{position:absolute;left:20px;right:110px;bottom:150px;transition:right .3s;}
+  body.gesture-on .card-info{right:290px;}
+  .card-author{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;margin-bottom:8px;}
   .card-author .dot{width:4px;height:4px;border-radius:50%;background:var(--muted);}
-  .card-desc{font-size:13.5px; line-height:1.6; color:rgba(255,255,255,.92); margin-bottom:8px;}
-  .card-tags{font-size:12.5px; color:var(--cyan); opacity:.85;}
+  .card-desc{font-size:13.5px;line-height:1.6;color:rgba(255,255,255,.92);margin-bottom:8px;}
+  .card-tags{font-size:12.5px;color:var(--cyan);opacity:.85;}
   .card-music{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:10px;}
-
-  /* 进度条 */
-  .progress{
-    position:absolute; left:0; right:0; bottom:0; height:2px;
-    background:rgba(255,255,255,.14);
-  }
-  .progress i{
-    display:block; height:100%; width:0;
-    background:rgba(255,255,255,.55);
-  }
-  .card.active .progress i{ animation:play 18s linear forwards; }
+  .progress{position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(255,255,255,.14);}
+  .progress i{display:block;height:100%;width:0;background:rgba(255,255,255,.55);}
+  .card.active .progress i{animation:play 18s linear forwards;}
   @keyframes play{from{width:0}to{width:100%}}
 
-  /* 右侧操作栏 */
-  .rail{
-    position:absolute; right:16px; bottom:132px;
-    display:flex; flex-direction:column; align-items:center; gap:20px; z-index:5;
-    transition:right .3s cubic-bezier(.2,.8,.3,1);
-  }
-  body.gesture-on .rail{right:204px;}
+  .rail{position:absolute;right:16px;bottom:150px;display:flex;flex-direction:column;align-items:center;gap:20px;z-index:5;transition:right .3s cubic-bezier(.2,.8,.3,1);}
+  body.gesture-on .rail{right:230px;}
+  body.gesture-on.preview-large .rail{right:372px;}
+  body.gesture-on.preview-large .card-info{right:432px;}
   .rail-item{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;}
-  .rail-item svg{width:30px;height:30px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5)); transition:transform .15s;}
+  .rail-item svg{width:30px;height:30px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));transition:transform .15s;}
   .rail-item:hover svg{transform:scale(1.12);}
   .rail-item span{font-size:11px;color:rgba(255,255,255,.85);}
   .rail-item.liked svg{fill:var(--red);stroke:var(--red);}
-  .avatar{
-    width:44px;height:44px;border-radius:50%;
-    border:1.5px solid rgba(255,255,255,.9);
-    display:grid;place-items:center;font-size:15px;font-weight:700;
-    background:linear-gradient(135deg,#6a4dff,#fe2c55);
-  }
-  .avatar-badge{
-    position:absolute; bottom:-7px; left:50%; transform:translateX(-50%);
-    width:18px;height:18px;border-radius:50%;background:var(--red);
-    display:grid;place-items:center;font-size:12px;line-height:1;color:#fff;font-weight:600;
-  }
+  .avatar{width:44px;height:44px;border-radius:50%;border:1.5px solid rgba(255,255,255,.9);display:grid;place-items:center;font-size:15px;font-weight:700;background:linear-gradient(135deg,#6a4dff,#fe2c55);}
+  .avatar-badge{position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);width:18px;height:18px;border-radius:50%;background:var(--red);display:grid;place-items:center;font-size:12px;line-height:1;color:#fff;font-weight:600;}
 
-  /* 顶栏 */
-  .topbar{
-    position:absolute; top:0; left:0; right:0; height:56px; z-index:6;
-    display:flex; align-items:center; justify-content:center; gap:22px;
-    background:linear-gradient(to bottom, rgba(0,0,0,.55), transparent);
-    font-size:15px; pointer-events:none;
-  }
-  .topbar b{font-weight:600; color:rgba(255,255,255,.55); position:relative; padding-bottom:6px;}
+  .topbar{position:absolute;top:0;left:0;right:0;height:56px;z-index:6;display:flex;align-items:center;justify-content:center;gap:22px;background:linear-gradient(to bottom,rgba(0,0,0,.55),transparent);font-size:15px;pointer-events:none;}
+  .topbar b{font-weight:600;color:rgba(255,255,255,.55);position:relative;padding-bottom:6px;}
   .topbar b.on{color:#fff;}
-  .topbar b.on::after{
-    content:""; position:absolute; left:50%; bottom:0; transform:translateX(-50%);
-    width:18px;height:2.5px;border-radius:2px;background:#fff;
-  }
+  .topbar b.on::after{content:"";position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:18px;height:2.5px;border-radius:2px;background:#fff;}
 
-  /* ============ 手势 FAB ============ */
-  #fab{
-    position:absolute; right:20px; bottom:24px; z-index:30;
-    width:52px;height:52px;border-radius:50%; border:1px solid var(--line-strong);
-    background:rgba(24,24,30,.9); backdrop-filter:blur(12px);
-    display:grid;place-items:center; cursor:pointer;
-    box-shadow:var(--shadow); transition:.25s;
-  }
-  #fab svg{width:26px;height:26px;stroke:var(--muted); fill:none; stroke-width:1.7; transition:.25s;}
-  #fab:hover{border-color:var(--line-strong); transform:translateY(-2px);}
-  #fab.on{border-color:rgba(37,244,238,.6); background:rgba(37,244,238,.12);}
+  #fab{position:absolute;right:20px;bottom:24px;z-index:30;width:52px;height:52px;border-radius:50%;border:1px solid var(--line-strong);background:rgba(24,24,30,.9);backdrop-filter:blur(12px);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow);transition:.25s;}
+  #fab svg{width:24px;height:24px;stroke:var(--muted);fill:none;stroke-width:1.7;transition:.25s;}
+  #fab:hover{transform:translateY(-2px);}
+  #fab.on{border-color:rgba(37,244,238,.6);background:rgba(37,244,238,.12);}
   #fab.on svg{stroke:var(--cyan);}
-  #fab.on::after{
-    content:""; position:absolute; inset:-4px;border-radius:50%;
-    border:1px solid rgba(37,244,238,.35);
-    animation:halo 2.4s ease-out infinite;
-  }
+  #fab.on::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1px solid rgba(37,244,238,.35);animation:halo 2.4s ease-out infinite;}
   @keyframes halo{0%{transform:scale(.95);opacity:.9}70%{transform:scale(1.25);opacity:0}100%{opacity:0}}
-  #fab .fabbadge{
-    position:absolute; top:-4px; right:-4px; width:14px;height:14px;border-radius:50%;
-    background:var(--dim); border:2px solid var(--bg); transition:.25s;
-  }
-  #fab.on .fabbadge{background:var(--green);}
-  #fab.busy{animation:shake .4s;}
-  @keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+  #fab .fabbadge{position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:50%;background:var(--dim);border:2px solid var(--bg);transition:.25s;}
+  #fab.on .fabbadge{background:var(--green);box-shadow:0 0 8px rgba(61,220,132,.8);}
 
-  /* ============ 预览小窗 ============ */
-  #preview{
-    position:absolute; right:20px; bottom:88px; z-index:29;
-    width:168px; border-radius:var(--r-lg); overflow:hidden;
-    background:var(--panel); border:1px solid var(--line);
-    backdrop-filter:blur(16px); box-shadow:var(--shadow);
-    opacity:0; transform:translateY(10px) scale(.96); pointer-events:none;
-    transition:.3s cubic-bezier(.2,.8,.3,1);
-  }
-  #preview.show{opacity:1; transform:none; pointer-events:auto;}
-  .preview-head{
-    display:flex; align-items:center; justify-content:space-between;
-    padding:7px 9px; font-size:10.5px; color:var(--muted);
-    border-bottom:1px solid var(--line);
-  }
+  #preview{position:absolute;right:20px;bottom:88px;z-index:29;width:196px;border-radius:var(--r-lg);overflow:hidden;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(16px);box-shadow:var(--shadow);opacity:0;transform:translateY(10px) scale(.96);pointer-events:none;transition:.3s cubic-bezier(.2,.8,.3,1);}
+  #preview.show{opacity:1;transform:none;pointer-events:auto;}
+  #preview.large{width:332px;}
+  .preview-head{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;font-size:10.5px;color:var(--muted);border-bottom:1px solid var(--line);cursor:pointer;}
   .preview-head .st{display:flex;align-items:center;gap:5px;}
   .dot-status{width:6px;height:6px;border-radius:50%;background:var(--dim);transition:.2s;}
-  .dot-status.ready{background:var(--green); box-shadow:0 0 8px rgba(61,220,132,.7);}
-  .dot-status.detect{background:var(--cyan); box-shadow:0 0 8px rgba(37,244,238,.8);}
-  .dot-status.trigger{background:#5b8bff; box-shadow:0 0 10px rgba(91,139,255,.9);}
-  .preview-cam{
-    position:relative; height:104px; background:#0d0f14;
-    display:grid; place-items:center; overflow:hidden;
-  }
-  .preview-cam::before{
-    content:""; position:absolute; inset:0;
-    background:
-      radial-gradient(circle at 50% 55%, rgba(90,110,150,.28), transparent 62%),
-      repeating-linear-gradient(0deg, rgba(255,255,255,.02) 0 1px, transparent 1px 3px);
-  }
-  #handSvg{width:74px; height:80px; position:relative; transition:transform .55s cubic-bezier(.3,.7,.3,1);}
-  #handSvg.up{transform:translateY(-12px);}
-  #handSvg.down{transform:translateY(12px);}
-  .preview-foot{
-    display:flex; justify-content:space-between; padding:6px 9px;
-    font-size:10px; color:var(--dim); border-top:1px solid var(--line);
-    font-variant-numeric:tabular-nums;
-  }
-  .preview-foot b{color:var(--muted); font-weight:500;}
+  .dot-status.ready{background:var(--green);box-shadow:0 0 8px rgba(61,220,132,.7);}
+  .dot-status.detect{background:var(--cyan);box-shadow:0 0 8px rgba(37,244,238,.8);}
+  .dot-status.trigger{background:#5b8bff;box-shadow:0 0 10px rgba(91,139,255,.9);}
+  .preview-cam{position:relative;background:#05060a;overflow:hidden;aspect-ratio:4/3;}
+  #cam{width:100%;height:100%;display:block;transform:scaleX(-1);object-fit:cover;}
+  #overlay{position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1);}
+  .cam-hint{position:absolute;inset:0;display:grid;place-items:center;font-size:10.5px;color:var(--dim);text-align:center;padding:0 12px;line-height:1.6;}
+  .preview-foot{display:flex;justify-content:space-between;padding:6px 10px;font-size:10px;color:var(--dim);border-top:1px solid var(--line);font-variant-numeric:tabular-nums;}
+  .preview-foot b{color:var(--muted);font-weight:500;}
 
-  /* ============ 识别流水线 ============ */
-  #pipeline{
-    position:absolute; left:50%; bottom:26px; transform:translate(-50%,14px);
-    z-index:28; width:min(92vw,430px);
-    background:var(--panel); border:1px solid var(--line);
-    border-radius:var(--r-lg); padding:12px 14px;
-    backdrop-filter:blur(16px); box-shadow:var(--shadow);
-    opacity:0; pointer-events:none; transition:.28s;
-  }
-  #pipeline.show{opacity:1; transform:translate(-50%,0);}
-  .pipe-title{
-    display:flex; justify-content:space-between; align-items:center;
-    font-size:11px; color:var(--dim); margin-bottom:9px; letter-spacing:.02em;
-  }
-  .pipe-chips{display:flex; gap:6px; flex-wrap:wrap;}
-  .chip{
-    flex:1; min-width:0; text-align:center;
-    padding:6px 4px; border-radius:7px; font-size:10.5px;
-    background:rgba(255,255,255,.045); color:var(--dim);
-    border:1px solid transparent; transition:.22s;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  }
-  .chip b{display:block; font-size:9.5px; font-weight:500; opacity:.65; margin-bottom:1px;}
-  .chip.ok{background:rgba(61,220,132,.13); color:var(--green); border-color:rgba(61,220,132,.35);}
-  .chip.fail{background:rgba(254,44,85,.12); color:var(--red); border-color:rgba(254,44,85,.35);}
-  .chip.wait{background:rgba(37,244,238,.10); color:var(--cyan); border-color:rgba(37,244,238,.3);}
-  .pipe-result{
-    margin-top:10px; padding-top:9px; border-top:1px solid var(--line);
-    font-size:11.5px; color:var(--muted); display:flex; justify-content:space-between;
-    font-variant-numeric:tabular-nums;
-  }
-  .pipe-result b{color:var(--text); font-weight:600;}
+  #status{padding:10px 12px;border-top:1px solid var(--line);background:rgba(0,0,0,.18);}
+  .st-title{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--dim);margin-bottom:7px;letter-spacing:.02em;}
+  .st-chips{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;}
+  .chip{padding:5px 2px;border-radius:6px;font-size:9.5px;text-align:center;background:rgba(255,255,255,.045);color:var(--dim);border:1px solid transparent;transition:.15s;white-space:nowrap;overflow:hidden;}
+  .chip b{display:block;font-size:8.5px;font-weight:500;opacity:.6;margin-bottom:1px;}
+  .chip.ok{background:rgba(61,220,132,.14);color:var(--green);border-color:rgba(61,220,132,.35);}
+  .chip.no{background:rgba(255,255,255,.04);color:var(--dim);}
+  .st-nums{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;margin-top:7px;font-size:9.5px;color:var(--dim);font-variant-numeric:tabular-nums;}
+  .st-nums span{display:flex;justify-content:space-between;gap:4px;}
+  .st-nums b{color:var(--muted);font-weight:500;}
+  .st-result{margin-top:7px;padding-top:6px;border-top:1px solid var(--line);font-size:10px;color:var(--muted);display:flex;justify-content:space-between;gap:6px;}
+  .st-result b{color:var(--cyan);font-weight:600;}
 
-  /* ============ 提示条 ============ */
-  #toast{
-    position:absolute; left:50%; top:76px; transform:translate(-50%,-12px);
-    z-index:40; padding:9px 16px; border-radius:99px;
-    background:rgba(20,20,26,.92); border:1px solid var(--line-strong);
-    font-size:12.5px; color:var(--text); backdrop-filter:blur(12px);
-    opacity:0; pointer-events:none; transition:.28s; white-space:nowrap;
-    box-shadow:var(--shadow);
-  }
-  #toast.show{opacity:1; transform:translate(-50%,0);}
+  #toast{position:absolute;left:50%;top:76px;transform:translate(-50%,-12px);z-index:40;padding:9px 16px;border-radius:99px;background:rgba(20,20,26,.94);border:1px solid var(--line-strong);font-size:12.5px;color:var(--text);backdrop-filter:blur(12px);opacity:0;pointer-events:none;transition:.28s;white-space:nowrap;box-shadow:var(--shadow);max-width:90vw;overflow:hidden;text-overflow:ellipsis;}
+  #toast.show{opacity:1;transform:translate(-50%,0);}
+  #toast.err{border-color:rgba(254,44,85,.5);background:rgba(40,10,18,.95);color:#ffc9d4;}
 
-  /* ============ 调试面板 ============ */
-  #debug{
-    position:absolute; left:20px; bottom:24px; z-index:26; width:236px;
-    background:var(--panel); border:1px solid var(--line);
-    border-radius:var(--r-lg); backdrop-filter:blur(16px);
-    box-shadow:var(--shadow); overflow:hidden;
-    transition:.28s;
-  }
-  .dbg-head{
-    display:flex; align-items:center; justify-content:space-between;
-    padding:9px 12px; cursor:pointer; font-size:11.5px; color:var(--muted);
-  }
-  .dbg-head .left{display:flex; align-items:center; gap:7px;}
-  .dbg-head .m{font-variant-numeric:tabular-nums; color:var(--dim); font-size:10.5px;}
-  .dbg-body{
-    padding:0 12px 12px; display:grid; gap:9px;
-    max-height:0; overflow:hidden; opacity:0; transition:.3s;
-  }
-  #debug.open .dbg-body{max-height:320px; opacity:1;}
-  .metric-row{
-    display:flex; justify-content:space-between; align-items:baseline;
-    font-size:11px; color:var(--muted);
-  }
-  .metric-row b{color:var(--text); font-weight:600; font-variant-numeric:tabular-nums; font-size:12px;}
-  .param-wrap{display:flex; flex-wrap:wrap; gap:5px; padding-top:2px;}
-  .param{
-    font-size:10px; padding:3px 7px; border-radius:6px;
-    background:rgba(255,255,255,.05); color:var(--muted);
-    border:1px solid var(--line); font-variant-numeric:tabular-nums;
-  }
-  .param.hl{color:var(--cyan); border-color:rgba(37,244,238,.28); background:rgba(37,244,238,.08);}
-  .test-btns{display:flex; gap:6px; padding-top:2px;}
-  .test-btns button{
-    flex:1; padding:7px 4px; border-radius:7px; cursor:pointer;
-    background:rgba(255,255,255,.06); border:1px solid var(--line);
-    color:var(--text); font-size:10.5px; font-family:inherit;
-    transition:.18s;
-  }
-  .test-btns button:hover{background:rgba(37,244,238,.12); border-color:rgba(37,244,238,.3); color:var(--cyan);}
-  .test-btns button:active{transform:scale(.97);}
-  .kbd-hint{font-size:9.5px; color:var(--dim); line-height:1.6; padding-top:2px;}
-  kbd{
-    background:rgba(255,255,255,.08); border:1px solid var(--line);
-    border-radius:4px; padding:1px 4px; font-size:9.5px; font-family:inherit;
-  }
+  #debug{position:absolute;left:20px;bottom:24px;z-index:26;width:250px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);backdrop-filter:blur(16px);box-shadow:var(--shadow);overflow:hidden;transition:.28s;}
+  .dbg-head{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;cursor:pointer;font-size:11.5px;color:var(--muted);}
+  .dbg-head .left{display:flex;align-items:center;gap:7px;}
+  .dbg-head .m{font-variant-numeric:tabular-nums;color:var(--dim);font-size:10.5px;}
+  .dbg-body{padding:0 12px 12px;display:grid;gap:8px;max-height:0;overflow:hidden;opacity:0;transition:.3s;}
+  #debug.open .dbg-body{max-height:460px;opacity:1;}
+  .metric-row{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--muted);}
+  .metric-row b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums;font-size:12px;}
+  .slider-row{font-size:10.5px;color:var(--muted);}
+  .slider-row .lab{display:flex;justify-content:space-between;margin-bottom:2px;}
+  .slider-row .lab b{color:var(--cyan);font-weight:600;font-variant-numeric:tabular-nums;}
+  input[type=range]{width:100%;height:14px;background:transparent;-webkit-appearance:none;cursor:pointer;}
+  input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:rgba(255,255,255,.14);}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:var(--cyan);margin-top:-4px;}
+  .test-btns{display:flex;gap:6px;}
+  .test-btns button{flex:1;padding:7px 4px;border-radius:7px;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--text);font-size:10.5px;font-family:inherit;transition:.18s;}
+  .test-btns button:hover{background:rgba(37,244,238,.12);border-color:rgba(37,244,238,.3);color:var(--cyan);}
+  .kbd-hint{font-size:9.5px;color:var(--dim);line-height:1.7;}
+  kbd{background:rgba(255,255,255,.08);border:1px solid var(--line);border-radius:4px;padding:1px 4px;font-size:9.5px;font-family:inherit;}
 
-  /* ============ 引导弹层 ============ */
-  #onboard{
-    position:absolute; inset:0; z-index:60; display:grid; place-items:center;
-    background:rgba(4,4,7,.72); backdrop-filter:blur(8px);
-    opacity:0; pointer-events:none; transition:.3s;
-  }
-  #onboard.show{opacity:1; pointer-events:auto;}
-  .ob-card{
-    width:min(92vw,392px); background:var(--panel-solid);
-    border:1px solid var(--line-strong); border-radius:18px;
-    padding:26px 24px 20px; box-shadow:0 24px 70px rgba(0,0,0,.7);
-    transform:translateY(8px); transition:.3s;
-  }
+  #onboard{position:absolute;inset:0;z-index:60;display:grid;place-items:center;background:rgba(4,4,7,.75);backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:.3s;}
+  #onboard.show{opacity:1;pointer-events:auto;}
+  .ob-card{width:min(92vw,400px);background:var(--panel-solid);border:1px solid var(--line-strong);border-radius:18px;padding:26px 24px 20px;box-shadow:0 24px 70px rgba(0,0,0,.7);transform:translateY(8px);transition:.3s;}
   #onboard.show .ob-card{transform:none;}
-  .ob-step{font-size:10.5px; color:var(--dim); letter-spacing:.08em; margin-bottom:10px;}
-  .ob-title{font-size:19px; font-weight:600; margin-bottom:8px; letter-spacing:-.01em;}
-  .ob-text{font-size:12.5px; line-height:1.75; color:var(--muted); margin-bottom:18px;}
-  .gesture-list{display:grid; gap:9px; margin-bottom:18px;}
-  .gesture-item{
-    display:flex; align-items:center; gap:12px;
-    padding:11px 13px; border-radius:11px;
-    background:rgba(255,255,255,.035); border:1px solid var(--line);
-  }
+  .ob-step{font-size:10.5px;color:var(--dim);letter-spacing:.08em;margin-bottom:10px;}
+  .ob-title{font-size:19px;font-weight:600;margin-bottom:8px;letter-spacing:-.01em;}
+  .ob-text{font-size:12.5px;line-height:1.75;color:var(--muted);margin-bottom:18px;}
+  .gesture-list{display:grid;gap:9px;margin-bottom:18px;}
+  .gesture-item{display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:11px;background:rgba(255,255,255,.035);border:1px solid var(--line);}
   .gesture-item svg{width:30px;height:34px;flex:none;stroke:var(--cyan);fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;opacity:.9;}
-  .gesture-item .g-name{font-size:12.5px; font-weight:600; margin-bottom:2px;}
-  .gesture-item .g-desc{font-size:10.5px; color:var(--muted);}
-  .gesture-item .g-key{
-    margin-left:auto; font-size:10.5px; color:var(--muted); min-width:22px; text-align:center;
-    border:1px solid var(--line-strong); border-radius:5px; padding:2px 6px;
-  }
-  .ob-foot{display:flex; align-items:center; justify-content:space-between;}
-  .dots{display:flex; gap:5px;}
-  .dots i{width:5px;height:5px;border-radius:50%;background:var(--line-strong); transition:.2s;}
-  .dots i.on{background:var(--cyan); width:14px; border-radius:3px;}
-  .btn-primary{
-    padding:9px 18px; border-radius:9px; border:none; cursor:pointer;
-    background:var(--cyan); color:#04131a; font-size:12.5px; font-weight:600;
-    font-family:inherit; transition:.18s;
-  }
+  .gesture-item .g-name{font-size:12.5px;font-weight:600;margin-bottom:2px;}
+  .gesture-item .g-desc{font-size:10.5px;color:var(--muted);}
+  .gesture-item .g-key{margin-left:auto;font-size:10.5px;color:var(--muted);min-width:22px;text-align:center;border:1px solid var(--line-strong);border-radius:5px;padding:2px 6px;}
+  .ob-foot{display:flex;align-items:center;justify-content:space-between;}
+  .dots{display:flex;gap:5px;}
+  .dots i{width:5px;height:5px;border-radius:50%;background:var(--line-strong);transition:.2s;}
+  .dots i.on{background:var(--cyan);width:14px;border-radius:3px;}
+  .btn-primary{padding:9px 18px;border-radius:9px;border:none;cursor:pointer;background:var(--cyan);color:#04131a;font-size:12.5px;font-weight:600;font-family:inherit;transition:.18s;}
   .btn-primary:hover{filter:brightness(1.08);}
-  .btn-primary:active{transform:scale(.98);}
-  .btn-ghost{
-    padding:9px 14px; border-radius:9px; cursor:pointer;
-    background:transparent; border:1px solid var(--line); color:var(--muted);
-    font-size:12px; font-family:inherit; transition:.18s;
-  }
-  .btn-ghost:hover{color:var(--text); border-color:var(--line-strong);}
+  .btn-primary:disabled{opacity:.55;cursor:default;}
+  .btn-ghost{padding:9px 14px;border-radius:9px;cursor:pointer;background:transparent;border:1px solid var(--line);color:var(--muted);font-size:12px;font-family:inherit;transition:.18s;}
+  .btn-ghost:hover{color:var(--text);border-color:var(--line-strong);}
 
-  /* 首次提示气泡 */
-  .hint-bubble{
-    position:absolute; right:84px; bottom:154px; z-index:27;
-    max-width:190px; padding:9px 12px; border-radius:10px;
-    background:rgba(37,244,238,.14); border:1px solid rgba(37,244,238,.35);
-    font-size:11px; line-height:1.6; color:#c9fffd;
-    opacity:0; transform:translateX(6px); transition:.3s; pointer-events:none;
-  }
-  .hint-bubble.show{opacity:1; transform:none;}
-  .hint-bubble::after{
-    content:""; position:absolute; right:-5px; bottom:12px;
-    width:9px;height:9px; background:inherit; border-right:1px solid rgba(37,244,238,.35);
-    border-top:1px solid rgba(37,244,238,.35); transform:rotate(45deg);
-  }
-
-  @media (max-width:560px){
-    #debug{width:calc(100vw - 40px); left:20px;}
-    #preview{width:132px; bottom:88px;}
-    .preview-cam{height:84px;}
-    #pipeline{width:calc(100vw - 40px); bottom:88px;}
-    body.gesture-on .rail{right:16px; bottom:250px;}
-    .card-info{bottom:180px;}
-    body.gesture-on .card-info{right:110px;}
+  @media (max-width:600px){
+    #debug{width:calc(100vw - 40px);}
+    #preview{width:168px;}
+    #preview.large{width:calc(100vw - 40px);}
+    body.gesture-on .rail{right:16px;bottom:300px;}
+    body.gesture-on .card-info{right:110px;bottom:300px;}
   }
 </style>
 </head>
@@ -348,111 +152,100 @@
 
 <div id="feed"></div>
 
-<div class="topbar">
-  <b class="on">推荐</b><b>关注</b><b>朋友</b><b>我的</b>
-</div>
+<div class="topbar"><b class="on">推荐</b><b>关注</b><b>朋友</b><b>我的</b></div>
 
 <div class="rail">
   <div class="rail-item" style="position:relative;margin-bottom:8px;">
-    <div class="avatar">山</div>
-    <div class="avatar-badge">+</div>
+    <div class="avatar">山</div><div class="avatar-badge">+</div>
   </div>
   <div class="rail-item" id="likeBtn">
-    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round">
-      <path d="M12 20.5s-7.5-4.6-7.5-9.4A4.1 4.1 0 0 1 12 8.2a4.1 4.1 0 0 1 7.5 2.9c0 4.8-7.5 9.4-7.5 9.4z"/>
-    </svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M12 20.5s-7.5-4.6-7.5-9.4A4.1 4.1 0 0 1 12 8.2a4.1 4.1 0 0 1 7.5 2.9c0 4.8-7.5 9.4-7.5 9.4z"/></svg>
     <span id="likeCount">12.4万</span>
   </div>
   <div class="rail-item">
-    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round">
-      <path d="M4 5.5h16v10H9l-5 3.5z"/>
-    </svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M4 5.5h16v10H9l-5 3.5z"/></svg>
     <span id="commentCount">2861</span>
   </div>
   <div class="rail-item">
-    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M4 12v7h3v-7zM9 19h8.2a2 2 0 0 0 2-1.7l1-5a2 2 0 0 0-2-2.3H14l.7-3.3A1.7 1.7 0 0 0 13 4.8L9 12"/>
-    </svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7h3v-7zM9 19h8.2a2 2 0 0 0 2-1.7l1-5a2 2 0 0 0-2-2.3H14l.7-3.3A1.7 1.7 0 0 0 13 4.8L9 12"/></svg>
     <span>分享</span>
   </div>
 </div>
 
 <button id="fab" title="手势控制（Alt+Shift+G）">
   <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11"/>
-    <path d="M12 10.5V4.5a1.5 1.5 0 0 1 3 0v6"/>
+    <path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M12 10.5V4.5a1.5 1.5 0 0 1 3 0v6"/>
     <path d="M15 11V6.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-1.2a6 6 0 0 1-4.6-2.2L4 15.4a1.6 1.6 0 0 1 2.4-2.1L9 16"/>
     <path d="M9 11v5"/>
   </svg>
   <i class="fabbadge"></i>
 </button>
 
-<div class="hint-bubble" id="hintBubble">向上挥手 →<br>切下一个视频</div>
-
 <div id="preview">
-  <div class="preview-head">
+  <div class="preview-head" id="previewHead">
     <span class="st"><i class="dot-status" id="statusDot"></i><span id="statusText">待命</span></span>
-    <span id="previewFps">29.4 fps</span>
+    <span id="previewFps">-- fps</span>
   </div>
   <div class="preview-cam">
-    <svg id="handSvg" viewBox="0 0 74 80" fill="none" stroke="#25f4ee" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M26 62 22 40c-.6-3 1-5 3.4-5s3.2 1.8 3.6 4l1 8"/>
-      <path d="M30 47V18c0-2.4 1.5-3.8 3.6-3.8S37 15.6 37 18v24"/>
-      <path d="M37 42V13.5c0-2.4 1.5-3.8 3.6-3.8S44 11.1 44 13.5V42"/>
-      <path d="M44 42V17c0-2.4 1.5-3.8 3.6-3.8S51 14.6 51 17v25"/>
-      <path d="M51 42V24c0-2.2 1.4-3.6 3.4-3.6S58 21.8 58 24v22c0 9-6 15-14 15-6 0-9-3-12-7.5"/>
-      <circle cx="33" cy="66" r="0" />
-    </svg>
+    <video id="cam" playsinline muted></video>
+    <canvas id="overlay" width="640" height="480"></canvas>
+    <div class="cam-hint" id="camHint">摄像头启动中…</div>
   </div>
   <div class="preview-foot">
     <span><b id="handState">未检测到手</b></span>
     <span id="latencyFoot">-- ms</span>
   </div>
-</div>
-
-<div id="pipeline">
-  <div class="pipe-title">
-    <span>识别流水线</span>
-    <span id="pipeTimer">0 ms</span>
-  </div>
-  <div class="pipe-chips">
-    <div class="chip" data-id="c1"><b>C1</b>五指伸直</div>
-    <div class="chip" data-id="c2"><b>C2</b>五指并拢</div>
-    <div class="chip" data-id="c3"><b>C3</b>掌面朝前</div>
-    <div class="chip" data-id="c4"><b>C4</b>纵向位移</div>
-  </div>
-  <div class="pipe-result">
-    <span id="pipeOutcome">等待手势…</span>
-    <span id="pipeMs"></span>
+  <div id="status">
+    <div class="st-title"><span>识别状态</span><span id="pipeTimer">--</span></div>
+    <div class="st-chips">
+      <div class="chip" data-id="c1"><b>C1</b>五指伸直</div>
+      <div class="chip" data-id="c2"><b>C2</b>五指并拢</div>
+      <div class="chip" data-id="c3"><b>C3</b>掌面朝前</div>
+      <div class="chip" data-id="c4"><b>C4</b>纵向位移</div>
+    </div>
+    <div class="st-nums">
+      <span>并拢<b id="nGap">--</b></span>
+      <span>掌面<b id="nFace">--</b></span>
+      <span>纵向<b id="nDy">--</b></span>
+      <span>横向<b id="nDx">--</b></span>
+    </div>
+    <div class="st-result"><span id="stResult">举手到镜头前试试</span><span id="stMs"></span></div>
   </div>
 </div>
 
 <div id="debug">
   <div class="dbg-head" id="dbgHead">
-    <span class="left">
-      <span style="color:var(--cyan);font-size:13px;line-height:1;">◈</span>
-      <span>手势调试</span>
-    </span>
+    <span class="left"><span style="color:var(--cyan);font-size:13px;line-height:1;">◈</span><span>识别调试</span></span>
     <span class="m" id="dbgSummary">未启用</span>
   </div>
   <div class="dbg-body">
     <div class="metric-row"><span>识别帧率</span><b id="mFps">-- fps</b></div>
-    <div class="metric-row"><span>平均端到端延迟</span><b id="mLatency">-- ms</b></div>
+    <div class="metric-row"><span>端到端延迟</span><b id="mLatency">-- ms</b></div>
     <div class="metric-row"><span>成功触发</span><b id="mTriggers">0 次</b></div>
-    <div class="metric-row"><span>误触发拦截</span><b id="mBlocked">0 次</b></div>
-    <div class="param-wrap">
-      <span class="param hl">时间窗 800ms</span>
-      <span class="param hl">冷却 1000ms</span>
-      <span class="param">位移 1.0 掌宽</span>
+    <div class="slider-row">
+      <div class="lab"><span>位移阈值（掌宽）</span><b id="vDisp">0.75</b></div>
+      <input type="range" id="sDisp" min="0.3" max="2" step="0.05" value="0.75">
+    </div>
+    <div class="slider-row">
+      <div class="lab"><span>时间窗</span><b id="vWin">500 ms</b></div>
+      <input type="range" id="sWin" min="200" max="1200" step="25" value="500">
+    </div>
+    <div class="slider-row">
+      <div class="lab"><span>并拢阈值</span><b id="vGap">0.55</b></div>
+      <input type="range" id="sGap" min="0.2" max="1.2" step="0.05" value="0.55">
+    </div>
+    <div class="slider-row">
+      <div class="lab"><span>冷却</span><b id="vCool">1000 ms</b></div>
+      <input type="range" id="sCool" min="400" max="2500" step="50" value="1000">
     </div>
     <div class="test-btns">
-      <button data-gesture="up">上滑</button>
-      <button data-gesture="down">下滑</button>
-      <button data-gesture="lift">抬手</button>
+      <button id="btnSimUp">模拟上滑</button>
+      <button id="btnSimDown">模拟下滑</button>
     </div>
-    <div class="kbd-hint">
-      <kbd>↑</kbd> <kbd>↓</kbd> 模拟手势　<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> 开关
+    <div class="test-btns">
+      <button id="btnLoose">识别不到？一键放宽阈值</button>
     </div>
+    <div class="kbd-hint"><kbd>↑</kbd> <kbd>↓</kbd> 模拟触发　<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> 开关　点击预览窗可放大</div>
   </div>
 </div>
 
@@ -462,7 +255,7 @@
   <div class="ob-card">
     <div class="ob-step" id="obStep">第 1 / 3 步</div>
     <div class="ob-title" id="obTitle">用手指代替滚轮</div>
-    <div class="ob-text" id="obText">开启后，摄像头会识别你的手掌动作。全程在本机处理，画面不上传。</div>
+    <div class="ob-text" id="obText">开启后会用摄像头实时识别手掌动作。画面只在本地处理，不上传，关闭开关后摄像头立即释放。</div>
 
     <div id="obBody1">
       <div class="gesture-list">
@@ -483,8 +276,8 @@
       <div class="gesture-list">
         <div class="gesture-item" style="border-color:rgba(37,244,238,.3);background:rgba(37,244,238,.06)">
           <svg viewBox="0 0 40 44"><rect x="9" y="14" width="22" height="16" rx="4"/><circle cx="20" cy="22" r="4"/><path d="M14 14V10h12v4"/></svg>
-          <div><div class="g-name">摄像头权限</div><div class="g-desc">仅用于识别，不上传</div></div>
-          <span class="g-key">演示</span>
+          <div><div class="g-name">浏览器会弹出授权</div><div class="g-desc">必须点「允许」，否则无法识别</div></div>
+          <span class="g-key">必需</span>
         </div>
       </div>
     </div>
@@ -493,7 +286,7 @@
       <div class="gesture-list">
         <div class="gesture-item">
           <svg viewBox="0 0 40 44"><path d="M14 34V16M20 34V12M26 34V12M32 34V16M10 34c0 6 4 8 9 8h2c5 0 9-2 9-8"/></svg>
-          <div><div class="g-name">手放到摄像头前</div><div class="g-desc">约 40–60cm，光线从正面来</div></div>
+          <div><div class="g-name">手放进画面中央</div><div class="g-desc">约 40–60cm，五指并拢伸直</div></div>
         </div>
       </div>
     </div>
@@ -508,50 +301,28 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
 <script>
 (function(){
   "use strict";
 
+  var CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240';
+
   var ITEMS = [
-    { author:"山野观察", desc:"雨后的竹林，雾从地面慢慢升起来，像有人在底下烧水", tags:"#自然 #治愈 #山野", likes:"12.4万", comments:"2861", music:"原声 · 山野观察", bg:"linear-gradient(160deg,#1b3a2f 0%,#2f6b46 45%,#0e1d18 100%)", tint:"#8fe3b0" },
-    { author:"深夜食堂", desc:"三分钟煮一碗番茄鸡蛋面，汤底只放两样东西", tags:"#美食 #深夜放毒", likes:"8.7万", comments:"1204", music:"深夜厨房 · 原声", bg:"linear-gradient(160deg,#5a1e14 0%,#c04a22 48%,#2a0d09 100%)", tint:"#ffb08a" },
-    { author:"机械师老陈", desc:"拆一台 1998 年的随身听，皮带已经化成泥了", tags:"#硬核 #怀旧 #拆解", likes:"23.1万", comments:"6892", music:"磁带转动声 · 原声", bg:"linear-gradient(160deg,#1a2238 0%,#3f5b8c 50%,#0b0f1a 100%)", tint:"#9db8e8" },
-    { author:"城市漫游", desc:"南宁中山路夜市的第三个钟头，人开始变多", tags:"#citywalk #南宁 #夜市", likes:"5.2万", comments:"934", music:"夜市人声 · 原声", bg:"linear-gradient(160deg,#3a1a3f 0%,#8a3f96 46%,#160a1a 100%)", tint:"#e3a8ee" },
-    { author:"一只柯基", desc:"它以为我要带它出门，其实我只是拿了个外卖", tags:"#萌宠 #柯基 #日常", likes:"46.8万", comments:"1.7万", music:"快乐小跑 · 原声", bg:"linear-gradient(160deg,#3d2a10 0%,#a8781f 48%,#1a1108 100%)", tint:"#ffd88a" },
-    { author:"手工阿茶", desc:"用 72 小时做一把木勺，最后打磨到能反光", tags:"#手作 #木工 #慢生活", likes:"9.3万", comments:"3527", music:"刨木声 · 原声", bg:"linear-gradient(160deg,#2b1f14 0%,#7a5230 48%,#120c08 100%)", tint:"#e0b98c" },
-    { author:"凌晨四点", desc:"便利店关东煮的第一锅，汤还是清的", tags:"#生活切片 #深夜", likes:"3.1万", comments:"618", music:"便利店背景音 · 原声", bg:"linear-gradient(160deg,#0f2b33 0%,#24707d 48%,#061619 100%)", tint:"#8ee0e8" },
-    { author:"数据可视化", desc:"一条视频看完十年 GDP 变化，最后三秒最精彩", tags:"#知识 #数据 #可视化", likes:"17.6万", comments:"4203", music:"节奏电子 · 原声", bg:"linear-gradient(160deg,#141a2e 0%,#2f4b8f 50%,#080b14 100%)", tint:"#a8c2ff" }
+    { author:"山野观察", desc:"雨后的竹林，雾从地面慢慢升起来，像有人在底下烧水", tags:"#自然 #治愈 #山野", likes:"12.4万", comments:"2861", music:"原声 · 山野观察", bg:"linear-gradient(160deg,#1b3a2f 0%,#2f6b46 45%,#0e1d18 100%)" },
+    { author:"深夜食堂", desc:"三分钟煮一碗番茄鸡蛋面，汤底只放两样东西", tags:"#美食 #深夜放毒", likes:"8.7万", comments:"1204", music:"深夜厨房 · 原声", bg:"linear-gradient(160deg,#5a1e14 0%,#c04a22 48%,#2a0d09 100%)" },
+    { author:"机械师老陈", desc:"拆一台 1998 年的随身听，皮带已经化成泥了", tags:"#硬核 #怀旧 #拆解", likes:"23.1万", comments:"6892", music:"磁带转动声 · 原声", bg:"linear-gradient(160deg,#1a2238 0%,#3f5b8c 50%,#0b0f1a 100%)" },
+    { author:"城市漫游", desc:"南宁中山路夜市的第三个钟头，人开始变多", tags:"#citywalk #南宁 #夜市", likes:"5.2万", comments:"934", music:"夜市人声 · 原声", bg:"linear-gradient(160deg,#3a1a3f 0%,#8a3f96 46%,#160a1a 100%)" },
+    { author:"一只柯基", desc:"它以为我要带它出门，其实我只是拿了个外卖", tags:"#萌宠 #柯基 #日常", likes:"46.8万", comments:"1.7万", music:"快乐小跑 · 原声", bg:"linear-gradient(160deg,#3d2a10 0%,#a8781f 48%,#1a1108 100%)" },
+    { author:"手工阿茶", desc:"用 72 小时做一把木勺，最后打磨到能反光", tags:"#手作 #木工 #慢生活", likes:"9.3万", comments:"3527", music:"刨木声 · 原声", bg:"linear-gradient(160deg,#2b1f14 0%,#7a5230 48%,#120c08 100%)" },
+    { author:"凌晨四点", desc:"便利店关东煮的第一锅，汤还是清的", tags:"#生活切片 #深夜", likes:"3.1万", comments:"618", music:"便利店背景音 · 原声", bg:"linear-gradient(160deg,#0f2b33 0%,#24707d 48%,#061619 100%)" },
+    { author:"数据可视化", desc:"一条视频看完十年 GDP 变化，最后三秒最精彩", tags:"#知识 #数据 #可视化", likes:"17.6万", comments:"4203", music:"节奏电子 · 原声", bg:"linear-gradient(160deg,#141a2e 0%,#2f4b8f 50%,#080b14 100%)" }
   ];
 
-  var feed = document.getElementById('feed');
-  var fab = document.getElementById('fab');
-  var preview = document.getElementById('preview');
-  var statusDot = document.getElementById('statusDot');
-  var statusText = document.getElementById('statusText');
-  var handSvg = document.getElementById('handSvg');
-  var handState = document.getElementById('handState');
-  var previewFps = document.getElementById('previewFps');
-  var latencyFoot = document.getElementById('latencyFoot');
-  var pipeline = document.getElementById('pipeline');
-  var pipeOutcome = document.getElementById('pipeOutcome');
-  var pipeMs = document.getElementById('pipeMs');
-  var pipeTimer = document.getElementById('pipeTimer');
-  var toastEl = document.getElementById('toast');
-  var debug = document.getElementById('debug');
-  var dbgSummary = document.getElementById('dbgSummary');
-  var hintBubble = document.getElementById('hintBubble');
-  var onboard = document.getElementById('onboard');
+  var $ = function(id){ return document.getElementById(id); };
+  var feed = $('feed');
 
-  var state = {
-    enabled: false, busy: false,
-    triggers: 0, blocked: 0,
-    latencies: [],
-    lastTriggerAt: 0,
-    firstRun: true
-  };
-
-  /* ---------- 渲染视频流 ---------- */
-  function cardHTML(item, i){
+  feed.innerHTML = ITEMS.map(function(item, i){
     return '<article class="card" data-index="' + i + '">' +
       '<div class="card-bg" style="background:' + item.bg + '"></div>' +
       '<div class="card-scrim"></div>' +
@@ -564,34 +335,112 @@
       '</div>' +
       '<div class="progress"><i></i></div>' +
     '</article>';
-  }
-
-  feed.innerHTML = ITEMS.map(cardHTML).join('');
+  }).join('');
 
   var cards = Array.prototype.slice.call(feed.querySelectorAll('.card'));
   cards[0].classList.add('active');
 
-  /* ---------- 工具 ---------- */
-  function wait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+  var video = $('cam'), overlay = $('overlay'), octx = overlay.getContext('2d');
+  var camHint = $('camHint');
+  var preview = $('preview'), fab = $('fab');
+  var statusDot = $('statusDot'), statusText = $('statusText');
+  var handState = $('handState'), previewFps = $('previewFps'), latencyFoot = $('latencyFoot');
+  var stResult = $('stResult'), stMs = $('stMs'), pipeTimer = $('pipeTimer');
+  var toastEl = $('toast'), debug = $('debug'), dbgSummary = $('dbgSummary');
+  var onboard = $('onboard');
 
-  var toastTimer = null;
-  function toast(msg){
+  var P = { disp:0.75, win:500, gap:0.55, cool:1000 };
+  var S = {
+    on:false, starting:false, stream:null, hands:null, running:false,
+    lastFire:0, triggers:0, latencies:[], fps:0,
+    frames:0, fpsT0:0, busy:false, lastUI:0, handSeen:false,
+    buf: []
+  };
+  var current = 0;
+
+  function toast(msg, isErr){
     toastEl.textContent = msg;
-    toastEl.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 1700);
+    toastEl.className = 'show' + (isErr ? ' err' : '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function(){ toastEl.className = ''; }, isErr ? 5200 : 1800);
   }
-
   function setStatus(kind){
     statusDot.className = 'dot-status' + (kind === 'ready' ? ' ready' : kind === 'detect' ? ' detect' : kind === 'trigger' ? ' trigger' : '');
     statusText.textContent = kind === 'ready' ? '待命' : kind === 'detect' ? '检测到手' : kind === 'trigger' ? '已触发' : '待命';
-    if (kind === 'trigger') {
-      setTimeout(function(){ if (state.enabled) setStatus('ready'); }, 700);
-    }
+    if (kind === 'trigger') setTimeout(function(){ if (S.on) setStatus('ready'); }, 650);
+  }
+  function setChip(id, on){
+    var el = preview.querySelector('.chip[data-id="' + id + '"]');
+    if (el) el.className = 'chip ' + (on ? 'ok' : 'no');
+  }
+  function dist(a, b){ return Math.hypot(a.x - b.x, a.y - b.y, (a.z || 0) - (b.z || 0)); }
+  function angleAt(a, b, c){
+    var v1x = a.x - b.x, v1y = a.y - b.y, v1z = (a.z || 0) - (b.z || 0);
+    var v2x = c.x - b.x, v2y = c.y - b.y, v2z = (c.z || 0) - (b.z || 0);
+    var d = v1x * v2x + v1y * v2y + v1z * v2z;
+    var m1 = Math.hypot(v1x, v1y, v1z), m2 = Math.hypot(v2x, v2y, v2z);
+    if (!m1 || !m2) return 0;
+    var cos = d / (m1 * m2);
+    return Math.acos(Math.max(-1, Math.min(1, cos))) * 180 / Math.PI;
   }
 
-  /* ---------- 切换视频 ---------- */
-  var current = 0;
+  var CONN = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+              [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+
+  function drawHand(lm){
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+    if (!lm) return;
+    var W = overlay.width, H = overlay.height;
+    octx.lineWidth = 5;
+    octx.strokeStyle = 'rgba(37,244,238,.85)';
+    octx.lineCap = 'round';
+    CONN.forEach(function(p){
+      octx.beginPath();
+      octx.moveTo(lm[p[0]].x * W, lm[p[0]].y * H);
+      octx.lineTo(lm[p[1]].x * W, lm[p[1]].y * H);
+      octx.stroke();
+    });
+    octx.fillStyle = '#25f4ee';
+    lm.forEach(function(p, i){
+      octx.beginPath();
+      octx.arc(p.x * W, p.y * H, i % 4 === 0 ? 6 : 4, 0, Math.PI * 2);
+      octx.fill();
+    });
+  }
+
+  function evaluate(lm, W, H){
+    // 关键：把归一化坐标换算到像素尺度再算角度/距离
+    // 归一化坐标里 x 除以宽、y 除以高，两者单位不同，非正方形画面会把角度算歪
+    var p = lm.map(function(q){ return { x: q.x * W, y: q.y * H, z: (q.z || 0) * W }; });
+
+    var pw = dist(p[5], p[17]) || 0.0001;
+
+    var fingers = [[5,6,7,8],[9,10,11,12],[13,14,15,16],[17,18,19,20]];
+    var straight = true;
+    fingers.forEach(function(f){
+      if (angleAt(p[f[0]], p[f[1]], p[f[3]]) < 155) straight = false;
+    });
+    if (angleAt(p[1], p[2], p[4]) < 145) straight = false;
+
+    var gaps = [dist(p[8], p[12]), dist(p[12], p[16]), dist(p[16], p[20])].map(function(d){ return d / pw; });
+    var gapRatio = Math.max.apply(null, gaps);
+    var together = gapRatio < P.gap;
+
+    var ax = p[5].x - p[0].x, ay = p[5].y - p[0].y, az = p[5].z - p[0].z;
+    var bx = p[17].x - p[0].x, by = p[17].y - p[0].y, bz = p[17].z - p[0].z;
+    var nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+    var nm = Math.hypot(nx, ny, nz) || 0.0001;
+    var faceRatio = Math.abs(nz) / nm;
+    var facing = faceRatio > 0.55;
+
+    var ids = [0, 5, 9, 13, 17];
+    var cx = 0, cy = 0;
+    ids.forEach(function(i){ cx += p[i].x; cy += p[i].y; });
+    cx /= ids.length; cy /= ids.length;
+
+    return { pw:pw, cx:cx, cy:cy, straight:straight, together:together, facing:facing, gapRatio:gapRatio, faceRatio:faceRatio };
+  }
+
   function step(dir){
     var next = current + dir;
     if (next < 0) { toast('已经是第一个视频'); return false; }
@@ -601,241 +450,313 @@
     return true;
   }
 
-  feed.addEventListener('scroll', function(){
-    var idx = Math.round(feed.scrollTop / feed.clientHeight);
-    if (idx !== current) current = idx;
-    cards.forEach(function(c, i){ c.classList.toggle('active', i === idx); });
-    syncRail();
-  }, { passive:true });
-
-  function syncRail(){
-    var item = ITEMS[current] || ITEMS[0];
-    document.getElementById('likeCount').textContent = item.likes;
-    document.getElementById('commentCount').textContent = item.comments;
-    document.querySelector('.rail .avatar').textContent = item.author.charAt(0);
-  }
-
-  /* ---------- 识别流水线 ---------- */
-  function setChip(id, cls){
-    var el = pipeline.querySelector('.chip[data-id="' + id + '"]');
-    if (el) el.className = 'chip ' + cls;
-  }
-  function clearChips(){
-    Array.prototype.forEach.call(pipeline.querySelectorAll('.chip'), function(el){ el.className = 'chip'; });
-  }
-
-  var pipelineTimer = null;
-  function startPipeTimer(){
-    var t0 = performance.now();
-    clearInterval(pipelineTimer);
-    pipelineTimer = setInterval(function(){
-      pipeTimer.textContent = Math.round(performance.now() - t0) + ' ms';
-    }, 40);
-    return function(){
-      clearInterval(pipelineTimer);
-      var total = Math.round(performance.now() - t0);
-      pipeTimer.textContent = total + ' ms';
-      return total;
-    };
-  }
-
-  async function runGesture(kind){
-    if (!state.enabled) {
-      fab.classList.add('busy');
-      setTimeout(function(){ fab.classList.remove('busy'); }, 420);
-      toast('手势控制未开启，点右下角按钮');
-      return;
-    }
-    if (state.busy) return;
-
-    var now = Date.now();
-    if (now - state.lastTriggerAt < 1000) {
-      toast('冷却中 ' + Math.ceil((1000 - (now - state.lastTriggerAt)) / 100) / 10 + 's');
-      return;
-    }
-
-    state.busy = true;
-    clearChips();
-    pipeOutcome.textContent = '正在识别…';
-    pipeMs.textContent = '';
-    pipeline.classList.add('show');
-    var stopTimer = startPipeTimer();
-
-    setStatus('detect');
-    handState.textContent = '已检测到手';
-    handSvg.classList.add(kind === 'down' ? 'down' : 'up');
-    setTimeout(function(){ handSvg.classList.remove('up','down'); }, 620);
-
-    // C1 → C4 依次判定，总耗时控制在 300ms 以内（对应 PRD 延迟指标）
-    await wait(34); setChip('c1', 'wait'); await wait(44); setChip('c1', 'ok');
-    await wait(16); setChip('c2', 'wait'); await wait(44); setChip('c2', 'ok');
-    await wait(16); setChip('c3', 'wait'); await wait(44); setChip('c3', 'ok');
-
-    if (kind === 'lift') {
-      // 抬手：C4 失败，安全拦截
-      await wait(16); setChip('c4', 'wait'); await wait(66); setChip('c4', 'fail');
-      stopTimer();
-      pipeOutcome.textContent = '未触发 · C4 位移不足，已拦截';
-      pipeMs.textContent = '抬手误判';
-      state.blocked++;
-      updateMetrics();
-      setStatus('ready');
-      await wait(1500);
-      pipeline.classList.remove('show');
-      state.busy = false;
-      return;
-    }
-
-    await wait(18); setChip('c4', 'wait'); await wait(72); setChip('c4', 'ok');
-
-    var latency = stopTimer();
-    var label = kind === 'up' ? 'G1 五指平行上滑' : 'G2 五指平行下滑';
-    pipeOutcome.textContent = '已识别 · ' + label;
-    pipeMs.textContent = latency + ' ms';
-
-    state.triggers++;
-    state.latencies.push(latency);
-    if (state.latencies.length > 12) state.latencies.shift();
-    state.lastTriggerAt = Date.now();
+  function fire(dir, latency){
+    var now = performance.now();
+    if (now - S.lastFire < P.cool) return false;
+    S.lastFire = now;
+    S.triggers++;
+    S.latencies.push(latency);
+    if (S.latencies.length > 12) S.latencies.shift();
 
     latencyFoot.textContent = latency + ' ms';
+    stResult.textContent = (dir > 0 ? 'G1 上滑 · 下一个' : 'G2 下滑 · 上一个');
+    stMs.textContent = latency + ' ms';
     setStatus('trigger');
-    var moved = step(kind === 'up' ? 1 : -1);
-    toast((kind === 'up' ? '下一个视频' : '上一个视频') + ' · ' + latency + 'ms');
+    step(dir);
+    toast((dir > 0 ? '下一个视频' : '上一个视频') + ' · ' + latency + 'ms');
     updateMetrics();
-
-    await wait(1450);
-    pipeline.classList.remove('show');
-    state.busy = false;
+    return true;
   }
 
   function updateMetrics(){
-    var avg = state.latencies.length
-      ? Math.round(state.latencies.reduce(function(a,b){ return a + b; }, 0) / state.latencies.length)
-      : 0;
-    document.getElementById('mTriggers').textContent = state.triggers + ' 次';
-    document.getElementById('mBlocked').textContent = state.blocked + ' 次';
-    document.getElementById('mLatency').textContent = avg ? avg + ' ms' : '-- ms';
-    dbgSummary.textContent = state.enabled
-      ? state.triggers + ' 触发 · ' + state.blocked + ' 拦截'
-      : '未启用';
+    var avg = S.latencies.length ? Math.round(S.latencies.reduce(function(a, b){ return a + b; }, 0) / S.latencies.length) : 0;
+    $('mTriggers').textContent = S.triggers + ' 次';
+    $('mLatency').textContent = avg ? avg + ' ms' : '-- ms';
+    dbgSummary.textContent = S.on ? (S.triggers + ' 触发') : '未启用';
   }
 
-  /* ---------- 帧率模拟 ---------- */
-  var fpsVal = 29.4;
-  setInterval(function(){
-    if (!state.enabled) return;
-    fpsVal = 27.8 + Math.random() * 3.4;
-    var txt = fpsVal.toFixed(1) + ' fps';
-    previewFps.textContent = txt;
-    document.getElementById('mFps').textContent = txt;
-  }, 900);
+  function onResults(res){
+    S.frames++;
+    var now = performance.now();
+    if (now - S.fpsT0 > 800) {
+      S.fps = Math.round(S.frames * 1000 / (now - S.fpsT0));
+      S.frames = 0; S.fpsT0 = now;
+      var txt = S.fps + ' fps';
+      previewFps.textContent = txt;
+      $('mFps').textContent = txt;
+    }
 
-  /* ---------- 开关 ---------- */
-  function enable(){
-    state.enabled = true;
+    var lm = res.multiHandLandmarks && res.multiHandLandmarks[0];
+    drawHand(lm);
+
+    if (!lm) {
+      camHint.style.display = 'none';
+      handState.textContent = '未检测到手';
+      if (!S.handSeen) setStatus('ready');
+      setChip('c1', false); setChip('c2', false); setChip('c3', false); setChip('c4', false);
+      S.buf.length = 0;
+      return;
+    }
+
+    S.handSeen = true;
+    camHint.style.display = 'none';
+    var W = video.videoWidth || 640, H = video.videoHeight || 480;
+    var e = evaluate(lm, W, H);
+
+    if (performance.now() - S.lastFire > 600) setStatus('detect');
+    handState.textContent = '已检测到手';
+
+    S.buf.push({ t: now, cx: e.cx, cy: e.cy, pw: e.pw });
+    while (S.buf.length && now - S.buf[0].t > 1400) S.buf.shift();
+
+    var ref = null;
+    for (var i = 0; i < S.buf.length; i++) {
+      if (now - S.buf[i].t <= P.win) { ref = S.buf[i]; break; }
+    }
+
+    var dy = 0, dx = 0, span = 0;
+    if (ref) {
+      span = now - ref.t;
+      dy = (e.cy - ref.cy) / e.pw;
+      dx = (e.cx - ref.cx) / e.pw;
+    }
+
+    var c4 = ref && (span > P.win * 0.55) && Math.abs(dy) >= P.disp && Math.abs(dx) < Math.abs(dy) * 0.8;
+
+    if (now - S.lastUI > 80) {
+      S.lastUI = now;
+      setChip('c1', e.straight);
+      setChip('c2', e.together);
+      setChip('c3', e.facing);
+      setChip('c4', !!c4);
+      $('nGap').textContent = e.gapRatio.toFixed(2) + ' / ' + P.gap.toFixed(2);
+      $('nFace').textContent = e.faceRatio.toFixed(2) + ' / 0.55';
+      $('nDy').textContent = (dy >= 0 ? '+' : '') + dy.toFixed(2) + ' / ' + P.disp.toFixed(2);
+      $('nDx').textContent = (dx >= 0 ? '+' : '') + dx.toFixed(2);
+      pipeTimer.textContent = Math.round(span) + ' / ' + P.win + 'ms';
+    }
+
+    if (c4 && e.straight && e.together && e.facing) {
+      var latency = Math.round(span);
+      if (fire(dy < 0 ? 1 : -1, latency)) S.buf.length = 0;
+    }
+  }
+
+  async function startCamera(){
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('当前环境不支持摄像头，请用 http://127.0.0.1 或 https 打开');
+    }
+    var stream = await navigator.mediaDevices.getUserMedia({
+      video: { width:{ ideal:640 }, height:{ ideal:480 }, facingMode:'user' },
+      audio: false
+    });
+    S.stream = stream;
+    video.srcObject = stream;
+    await video.play();
+    overlay.width = 640; overlay.height = 480;
+  }
+
+  function stopCamera(){
+    if (S.stream) {
+      S.stream.getTracks().forEach(function(t){ t.stop(); });
+      S.stream = null;
+    }
+    video.srcObject = null;
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+  }
+
+  async function startRecognizer(){
+    if (!window.Hands) {
+      await new Promise(function(res, rej){
+        var s = document.createElement('script');
+        s.src = CDN + '/hands.js';
+        s.crossOrigin = 'anonymous';
+        s.onload = res;
+        s.onerror = function(){ rej(new Error('MediaPipe 脚本加载失败，检查网络')); };
+        document.head.appendChild(s);
+      });
+    }
+    var hands = new window.Hands({ locateFile: function(f){ return CDN + '/' + f; } });
+    hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+    hands.onResults(onResults);
+    S.hands = hands;
+    S.running = true;
+    S.fpsT0 = performance.now();
+    pump();
+  }
+
+  async function pump(){
+    if (!S.running) return;
+    if (video.readyState >= 2 && !S.busy) {
+      S.busy = true;
+      try { await S.hands.send({ image: video }); } catch (err) {}
+      S.busy = false;
+    }
+    requestAnimationFrame(pump);
+  }
+
+  async function enable(){
+    if (S.on || S.starting) return;
+    S.starting = true;
     fab.classList.add('on');
     document.body.classList.add('gesture-on');
     preview.classList.add('show');
+    camHint.style.display = 'grid';
+    camHint.textContent = '正在请求摄像头…';
     setStatus('ready');
-    handState.textContent = '未检测到手';
-    document.getElementById('mFps').textContent = fpsVal.toFixed(1) + ' fps';
-    updateMetrics();
-    toast('手势控制已开启');
-    hintBubble.classList.add('show');
-    setTimeout(function(){ hintBubble.classList.remove('show'); }, 6000);
+
+    try {
+      await startCamera();
+      camHint.textContent = '摄像头已就绪，正在加载识别模型…';
+      await startRecognizer();
+      camHint.style.display = 'none';
+      camHint.textContent = '';
+      S.on = true;
+      S.lastFire = 0;
+      toast('已开启 · 把五指并拢的手放进画面');
+      stResult.textContent = '举起手，向上或向下挥';
+      updateMetrics();
+    } catch (err) {
+      stopCamera();
+      S.running = false;
+      fab.classList.remove('on');
+      document.body.classList.remove('gesture-on');
+      preview.classList.remove('show');
+      var name = err && err.name ? err.name : '';
+      var msg = name === 'NotAllowedError' ? '摄像头被拒绝：点地址栏相机图标允许后重试'
+        : name === 'NotFoundError' ? '没有找到摄像头设备'
+        : name === 'NotReadableError' ? '摄像头被其他程序占用（如会议软件）'
+        : (err && err.message ? err.message : '启动失败');
+      toast(msg, true);
+      console.error(err);
+    } finally {
+      S.starting = false;
+    }
   }
 
   function disable(){
-    state.enabled = false;
-    state.busy = false;
+    S.on = false;
+    S.running = false;
+    S.handSeen = false;
+    S.buf.length = 0;
+    stopCamera();
     fab.classList.remove('on');
     document.body.classList.remove('gesture-on');
     preview.classList.remove('show');
-    pipeline.classList.remove('show');
-    hintBubble.classList.remove('show');
     setStatus('off');
-    document.getElementById('mFps').textContent = '-- fps';
+    handState.textContent = '未检测到手';
+    previewFps.textContent = '-- fps';
+    latencyFoot.textContent = '-- ms';
+    stMs.textContent = '';
+    stResult.textContent = '举手到镜头前试试';
+    pipeTimer.textContent = '--';
+    setChip('c1', false); setChip('c2', false); setChip('c3', false); setChip('c4', false);
+    $('nGap').textContent = '--'; $('nFace').textContent = '--';
+    $('nDy').textContent = '--'; $('nDx').textContent = '--';
+    $('mFps').textContent = '-- fps';
     updateMetrics();
-    toast('已关闭，摄像头已释放');
+    toast('已关闭，摄像头已释放（指示灯应已熄灭）');
   }
 
-  function toggle(){ state.enabled ? disable() : openOnboard(); }
+  function toggle(){ if (S.on) disable(); else openOnboard(); }
 
-  fab.addEventListener('click', toggle);
-
-  /* ---------- 引导 ---------- */
   var obIdx = 0;
-  var obBodies = [
-    document.getElementById('obBody1'),
-    document.getElementById('obBody2'),
-    document.getElementById('obBody3')
-  ];
+  var obBodies = [$('obBody1'), $('obBody2'), $('obBody3')];
   var obDots = onboard.querySelectorAll('.dots i');
 
   function renderOb(){
-    document.getElementById('obStep').textContent = '第 ' + (obIdx + 1) + ' / 3 步';
-    var titles = ['用手指代替滚轮', '需要摄像头权限', '把手放到画面里'];
+    $('obStep').textContent = '第 ' + (obIdx + 1) + ' / 3 步';
+    var titles = ['用手指代替滚轮', '需要摄像头权限', '把手放进画面'];
     var texts = [
-      '开启后，摄像头会识别你的手掌动作。全程在本机处理，画面不上传。',
-      '演示版不会真的调用摄像头，点“允许”即可继续。真实版本中，权限只授予扩展本身。',
-      '距离约 40–60cm，光线从正面来。五指并拢伸直，向上或向下挥动。'
+      '这套手势靠摄像头实时识别，画面只在浏览器本地处理，不会上传到任何服务器。',
+      '点「允许」后，浏览器会请求摄像头。授权一次即可，之后不再询问。',
+      '距离约 40–60cm，光线从正面来。五指并拢伸直，整只手向上或向下挥。'
     ];
-    document.getElementById('obTitle').textContent = titles[obIdx];
-    document.getElementById('obText').textContent = texts[obIdx];
+    $('obTitle').textContent = titles[obIdx];
+    $('obText').textContent = texts[obIdx];
     obBodies.forEach(function(b, i){ b.style.display = i === obIdx ? 'block' : 'none'; });
     Array.prototype.forEach.call(obDots, function(d, i){ d.classList.toggle('on', i === obIdx); });
-    document.getElementById('obNext').textContent = obIdx === 2 ? '开始使用' : (obIdx === 1 ? '允许' : '下一步');
+    $('obNext').textContent = obIdx === 2 ? '开启摄像头' : (obIdx === 1 ? '允许' : '下一步');
   }
 
-  function openOnboard(){
-    if (!state.firstRun) { enable(); return; }
-    obIdx = 0;
-    renderOb();
-    onboard.classList.add('show');
-  }
+  function openOnboard(){ obIdx = 0; renderOb(); onboard.classList.add('show'); }
 
-  document.getElementById('obNext').addEventListener('click', function(){
+  $('obNext').addEventListener('click', function(){
     if (obIdx < 2) { obIdx++; renderOb(); }
-    else { onboard.classList.remove('show'); state.firstRun = false; enable(); }
+    else { onboard.classList.remove('show'); enable(); }
   });
-  document.getElementById('obSkip').addEventListener('click', function(){
-    onboard.classList.remove('show'); state.firstRun = false; enable();
+  $('obSkip').addEventListener('click', function(){ onboard.classList.remove('show'); enable(); });
+
+  fab.addEventListener('click', toggle);
+  $('previewHead').addEventListener('click', function(){
+    preview.classList.toggle('large');
+    document.body.classList.toggle('preview-large', preview.classList.contains('large'));
+  });
+  $('dbgHead').addEventListener('click', function(){ debug.classList.toggle('open'); });
+
+  function bindSlider(id, key, labelId, fmt){
+    var el = $(id);
+    el.addEventListener('input', function(){
+      P[key] = parseFloat(el.value);
+      $(labelId).textContent = fmt ? fmt(el.value) : el.value;
+    });
+  }
+  bindSlider('sDisp', 'disp', 'vDisp', function(v){ return parseFloat(v).toFixed(2); });
+  bindSlider('sWin', 'win', 'vWin', function(v){ return v + ' ms'; });
+  bindSlider('sGap', 'gap', 'vGap', function(v){ return parseFloat(v).toFixed(2); });
+  bindSlider('sCool', 'cool', 'vCool', function(v){ return v + ' ms'; });
+
+  function sim(dir){
+    if (!S.on) { toast('先开启手势控制'); return; }
+    fire(dir, 180 + Math.round(Math.random() * 60));
+  }
+  $('btnSimUp').addEventListener('click', function(){ sim(1); });
+  $('btnSimDown').addEventListener('click', function(){ sim(-1); });
+
+  $('btnLoose').addEventListener('click', function(){
+    var preset = { sDisp:'0.45', sWin:'650', sGap:'0.95', sCool:'900' };
+    function set(id, key, lab, fmt){
+      $(id).value = preset[id];
+      P[key] = parseFloat(preset[id]);
+      $(lab).textContent = fmt(preset[id]);
+    }
+    set('sDisp', 'disp', 'vDisp', function(v){ return parseFloat(v).toFixed(2); });
+    set('sWin', 'win', 'vWin', function(v){ return v + ' ms'; });
+    set('sGap', 'gap', 'vGap', function(v){ return parseFloat(v).toFixed(2); });
+    set('sCool', 'cool', 'vCool', function(v){ return v + ' ms'; });
+    toast('已放宽：位移 0.45 掌宽 / 并拢 0.95 / 时间窗 650ms');
   });
 
-  /* ---------- 调试面板 ---------- */
-  document.getElementById('dbgHead').addEventListener('click', function(){
-    debug.classList.toggle('open');
-  });
-
-  Array.prototype.forEach.call(document.querySelectorAll('.test-btns button'), function(btn){
-    btn.addEventListener('click', function(){ runGesture(btn.dataset.gesture); });
-  });
-
-  /* ---------- 点赞 ---------- */
-  document.getElementById('likeBtn').addEventListener('click', function(){
+  $('likeBtn').addEventListener('click', function(){
     this.classList.toggle('liked');
     toast(this.classList.contains('liked') ? '已点赞（演示）' : '已取消');
   });
 
-  /* ---------- 键盘 ---------- */
   document.addEventListener('keydown', function(e){
-    if (e.altKey && e.shiftKey && (e.key === 'G' || e.key === 'g')) {
-      e.preventDefault();
-      toggle();
-      return;
-    }
-    if (e.key === 'ArrowUp') { e.preventDefault(); runGesture('up'); }
-    if (e.key === 'ArrowDown') { e.preventDefault(); runGesture('down'); }
+    if (e.altKey && e.shiftKey && (e.key === 'G' || e.key === 'g')) { e.preventDefault(); toggle(); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); sim(1); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); sim(-1); }
   });
 
-  /* ---------- 初始 ---------- */
-  syncRail();
-  updateMetrics();
-  setTimeout(function(){ toast('点右下角手势按钮开始演示'); }, 700);
+  feed.addEventListener('scroll', function(){
+    var idx = Math.round(feed.scrollTop / feed.clientHeight);
+    current = Math.max(0, Math.min(ITEMS.length - 1, idx));
+    cards.forEach(function(c, i){ c.classList.toggle('active', i === current); });
+    var item = ITEMS[current];
+    $('likeCount').textContent = item.likes;
+    $('commentCount').textContent = item.comments;
+    document.querySelector('.rail .avatar').textContent = item.author.charAt(0);
+  }, { passive:true });
 
-  /* 供外部调试/截图调用：DEMO.enable() / DEMO.gesture('up') */
-  window.DEMO = { enable: enable, disable: disable, gesture: runGesture, step: step };
+  $('likeCount').textContent = ITEMS[0].likes;
+  $('commentCount').textContent = ITEMS[0].comments;
+  updateMetrics();
+  if (!window.isSecureContext) {
+    toast('当前不是安全上下文，摄像头会被浏览器拦截', true);
+  }
+  setTimeout(function(){ toast('点右下角手势按钮，授权摄像头'); }, 600);
+
+  window.DEMO = { enable:enable, disable:disable, sim:sim, step:step, params:P };
 })();
 </script>
 </body>
