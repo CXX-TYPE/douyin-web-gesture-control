@@ -44,7 +44,16 @@
     });
     var ext = ratio.map(function (r) { return r > P.curl; });
 
-    var thumbExt = dist(p[4], p[5]) / pw > P.thumb;
+    // 拇指判据改成「拇指尖是五指里离腕最远的」——
+    // 只看 4↔5 的距离在真实的手背上经常测不准（拇指贴着食指根）
+    var thumbFar = dist(p[0], p[4]) / pw;
+    var othersMax = Math.max(
+      dist(p[0], p[8]), dist(p[0], p[12]), dist(p[0], p[16]), dist(p[0], p[20])
+    ) / pw;
+    // 真正区分"竖拇指"和"握拳"的，是拇指尖离食指尖有多远：
+    // 握拳时拇指压在四指上，两者几乎贴在一起；竖拇指时明显分开
+    var thumbAway = dist(p[4], p[8]) / pw;
+    var thumbExt = (dist(p[4], p[5]) / pw > P.thumb) || thumbAway > 0.55;
     var gaps = [dist(p[8], p[12]), dist(p[12], p[16]), dist(p[16], p[20])].map(function (d) { return d / pw; });
     var spread = (gaps[0] + gaps[1] + gaps[2]) / 3;
 
@@ -58,7 +67,7 @@
     var pose = 0;
     if (up[0] && down[1] && down[2] && down[3]) { pose = 1; }
     else if (up[0] && up[1] && down[2] && down[3]) { pose = 2; }
-    else if (thumbExt && !up[0] && !up[1] && !(up[2] && up[3])) { pose = 3; }
+    else if (thumbAway > 0.55 && !up[0] && !up[1] && !(up[2] && up[3])) { pose = 3; }
     else if (up[0] && up[1] && up[2] && up[3] && spread > P.spread) { pose = 4; }
 
     var minX = 1, maxX = 0, minY = 1, maxY = 0;

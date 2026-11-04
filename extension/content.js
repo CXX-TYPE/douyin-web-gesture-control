@@ -91,6 +91,23 @@
   // 抖音播放页有两层 video：主视频和背景虚化视频，位置几乎重合。
   // 只按"视口中心"挑会挑到虚化那层——表现就是"倍速/暂停按了没反应"。
   // 改成打分：优先在播、优先有声、再看可见面积。
+  // 按「在播 > 有声 > 可见面积」排序，倍速时可以逐个试
+  function rankVideos() {
+    var arr = [];
+    Array.prototype.slice.call(document.querySelectorAll('video')).forEach(function (v) {
+      var r = v.getBoundingClientRect();
+      if (r.height < 100 || r.width < 100) return;
+      var vis = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)) *
+                Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0));
+      var score = vis;
+      if (!v.paused) score += 1e7;
+      if (!v.muted) score += 5e6;
+      arr.push({ v: v, score: score });
+    });
+    arr.sort(function (a, b) { return b.score - a.score; });
+    return arr.map(function (o) { return o.v; });
+  }
+
   function currentVideo() {
     var best = null, bestScore = -1;
     Array.prototype.slice.call(document.querySelectorAll('video')).forEach(function (v) {
@@ -144,19 +161,30 @@
   }
 
   async function cycleSpeed() {
-    var v = currentVideo() || pickVideo(true) || pickVideo(false);
-    if (!v) return '没有视频';
-    var next = v.playbackRate < 1.5 ? 2 : (v.playbackRate < 3 ? 4 : 1);
+    var cands = rankVideos();
+    if (!cands.length) { var one = pickVideo(true) || pickVideo(false); if (one) cands = [one]; }
+    if (!cands.length) return '没有视频';
 
-    v.defaultPlaybackRate = next;
-    v.playbackRate = next;
-    await sleep(150);
-    // 抖音播放器有时会把速率改回 1，检测到就再设一次
-    if (Math.abs(v.playbackRate - next) > 0.01) {
-      v.playbackRate = next;
-      await sleep(200);
+    // 逐条尝试：播放页会同时存在主视频和背景虚化视频，
+    // 只有真的把速率改成功的那一条才算数
+    for (var i = 0; i < Math.min(cands.length, 3); i++) {
+      var v = cands[i];
+      var next = v.playbackRate < 1.5 ? 2 : (v.playbackRate < 3 ? 4 : 1);
+      try {
+        v.defaultPlaybackRate = next;
+        v.playbackRate = next;
+      } catch (e) { continue; }
+      await sleep(180);
+      if (Math.abs(v.playbackRate - next) < 0.01) {
+        // 再守 600ms，防止播放器稍后改回
+        await sleep(600);
+        if (Math.abs(v.playbackRate - next) < 0.01) return next + ' 倍速';
+        v.playbackRate = next;
+        await sleep(250);
+        if (Math.abs(v.playbackRate - next) < 0.01) return next + ' 倍速';
+      }
     }
-    return Math.abs(v.playbackRate - next) < 0.01 ? (next + ' 倍速') : '倍速被页面改回';
+    return '倍速被页面改回';
   }
 
   function togglePause() {
@@ -186,8 +214,8 @@
 
   // 手势 → 动作。方向抽成配置，万一判反了不用改代码，弹窗里拨一下就行
   function actOf(pose) {
-    if (pose === 1) return swap12 ? 'prev' : 'next';
-    if (pose === 2) return swap12 ? 'next' : 'prev';
+    if (pose === 1) return swap12 ? 'next' : 'prev';   // 默认：比 1 = 上一个
+    if (pose === 2) return swap12 ? 'prev' : 'next';   // 默认：比 2 = 下一个
     if (pose === 3) return 'speed';
     if (pose === 4) return 'pause';
     return '';

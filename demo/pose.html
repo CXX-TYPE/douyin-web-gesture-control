@@ -314,12 +314,12 @@
       <div class="gesture-list">
         <div class="gesture-item">
           <svg viewBox="0 0 40 44"><path d="M13 40c0-7 1-13 1-19V10a2.6 2.6 0 0 1 5.2 0v12"/><path d="M19.2 22v-1a2.6 2.6 0 0 1 5.2 0v6"/><path d="M24.4 27v-3a2.6 2.6 0 0 1 5.2 0v8c0 5-3 8-7 8h-2c-4 0-7-2-7.6-5"/></svg>
-          <div><div class="g-name">比 1（只伸食指）</div><div class="g-desc">→ 下一个视频</div></div>
+          <div><div class="g-name">比 1（只伸食指）</div><div class="g-desc">→ 上一个视频</div></div>
           <span class="g-key">1</span>
         </div>
         <div class="gesture-item">
           <svg viewBox="0 0 40 44"><path d="M11 40c0-7 1-13 1-19V10a2.6 2.6 0 0 1 5.2 0v12"/><path d="M17.2 22V9a2.6 2.6 0 0 1 5.2 0v13"/><path d="M22.4 25v-6a2.6 2.6 0 0 1 5.2 0v12c0 5-3 9-8 9h-1c-4 0-7-2-7.6-5"/></svg>
-          <div><div class="g-name">比 2（食指+中指）</div><div class="g-desc">→ 上一个视频</div></div>
+          <div><div class="g-name">比 2（食指+中指）</div><div class="g-desc">→ 下一个视频</div></div>
           <span class="g-key">2</span>
         </div>
         <div class="gesture-item">
@@ -511,7 +511,8 @@
     var ext = ratio.map(function(r){ return r > P.curl; });
 
     // 拇指是否伸开：指尖(4) 离食指根(5) 足够远，说明没压在掌心里
-    var thumbExt = dist(p[4], p[5]) / pw > 0.30;
+    var thumbAway = dist(p[4], p[8]) / pw;
+    var thumbExt = dist(p[4], p[5]) / pw > 0.30 || thumbAway > 0.55;
     // 张开程度：相邻指尖的最大间距，用来区分「五指张开」和「五指并拢的平掌」
     var gaps = [dist(p[8], p[12]), dist(p[12], p[16]), dist(p[16], p[20])].map(function(d){ return d / pw; });
     var spread = (gaps[0] + gaps[1] + gaps[2]) / 3;   // 取平均，避免某一根手指抖动就把"张开"判错
@@ -522,9 +523,9 @@
     var down = ratio.map(function (r) { return r < LO; });
 
     var pose = 0, act = '';
-    if (up[0] && down[1] && down[2] && down[3]) { pose = 1; act = 'next'; }
-    else if (up[0] && up[1] && down[2] && down[3]) { pose = 2; act = 'prev'; }
-    else if (thumbExt && !up[0] && !up[1] && !(up[2] && up[3])) { pose = 3; act = 'speed'; }
+    if (up[0] && down[1] && down[2] && down[3]) { pose = 1; act = 'prev'; }
+    else if (up[0] && up[1] && down[2] && down[3]) { pose = 2; act = 'next'; }
+    else if (thumbAway > 0.55 && !up[0] && !up[1] && !(up[2] && up[3])) { pose = 3; act = 'speed'; }
     else if (up[0] && up[1] && up[2] && up[3] && spread > 0.28) { pose = 4; act = 'pause'; }
 
     // 朝向：掌面法向量的 z 分量占比。正对镜头接近 1，侧对镜头接近 0。
@@ -603,7 +604,7 @@
     S.latencies.push(latency);
     if (S.latencies.length > 12) S.latencies.shift();
 
-    var label = { next:'比 1 · 下一个', prev:'比 2 · 上一个', speed:'竖拇指 · 快进', pause:'五指张开 · 暂停' }[act] || act;
+    var label = { next:'比 2 · 下一个', prev:'比 1 · 上一个', speed:'竖拇指 · 快进', pause:'五指张开 · 暂停' }[act] || act;
     latencyFoot.textContent = latency + ' ms';
     stResult.textContent = label;
     stMs.textContent = latency + ' ms';
@@ -874,7 +875,7 @@
     var texts = [
       '用比数字代替滑屏。静态手势不看速度、不看方向，比一下就能切。画面只在本地处理，不上传。',
       '点「允许」后，浏览器会请求摄像头。授权一次即可，之后不再询问。',
-      '距离约 40–60cm，光线从正面来。四个手势：比 1 下一个、比 2 上一个、竖拇指快进、五指张开暂停。都比手背朝镜头，保持 0.3 秒。'
+      '距离约 40–60cm，光线从正面来。四个手势：比 1 上一个、比 2 下一个、竖拇指快进、五指张开暂停。都比手背朝镜头，保持 0.3 秒。'
     ];
     $('obTitle').textContent = titles[obIdx];
     $('obText').textContent = texts[obIdx];
