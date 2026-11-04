@@ -345,9 +345,11 @@
     }
   });
 
-  // 页内快捷键：Alt + Shift + G
+  // 页内快捷键：Alt + G（Alt+Shift+G 同样可用）
+  // 为什么不只留 Alt+Shift：Windows 默认把 Alt+Shift 当输入法切换热键，
+  // 系统先吃掉之后页面根本收不到 keydown，实测按了没反应。
   document.addEventListener('keydown', function (e) {
-    if (e.altKey && e.shiftKey && (e.key === 'G' || e.key === 'g')) {
+    if (e.altKey && (e.key === 'G' || e.key === 'g')) {
       e.preventDefault();
       setEnabled(!enabled);
     }
