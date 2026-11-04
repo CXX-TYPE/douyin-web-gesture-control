@@ -6,11 +6,23 @@
 
 ## 安装
 
-1. 打开 `edge://extensions`
-2. 打开左下角「开发人员模式」
-3. 点「加载解压缩的扩展」，选择本目录（`extension/`）
-4. 打开 https://www.douyin.com/ ，点工具栏扩展图标 → 打开开关
+> ⚠️ 本项目的目录名含中文（`dy网页版手势控制`），Edge 的文件夹选择框对中文路径支持不稳定。
+> 已在本机建好一个英文联接 `C://Users//<你>//Documents//dy-gesture-ext` 指向 `extension/`，
+> 安装时直接选它，不用手输路径。
+
+1. 打开 `edge://extensions`，左下角「开发人员模式」打开
+2. 点顶部「加载解压缩的扩展」
+3. 弹出的对话框默认停在**「文档」**，直接**双击 `dy-gesture-ext`** → 点「选择文件夹」
+4. 刷新抖音页面（`Ctrl + R`），按 `Alt + G` 开启
 5. 首次会请求摄像头权限，点「允许」
+
+如果第 3 步看不到 `dy-gesture-ext`，说明联接丢了，重新建一个：
+
+```bat
+mklink /J "%USERPROFILE%\Documents\dy-gesture-ext" "D://WorkBuddy//dy网页版手势控制//extension"
+```
+
+实在装不上就用一键启动脚本 `start-douyin.bat`（会先关掉 Edge，再用 `--load-extension` 加载）。
 
 ## 手势
 
