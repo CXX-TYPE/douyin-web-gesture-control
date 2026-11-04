@@ -17,10 +17,6 @@
   // 与 PRD v0.4.1 §5 参数表一致
   var P = { hold: 300, cool: 1000, curl: 1.15, spread: 0.28, thumb: 0.30, edge: 0.015, minPw: 22 };
 
-  // 按手势区分冷却：切视频要防连续误触（1000ms），
-  // 倍速是「连按两下」的操作，1000ms 会让人以为没反应
-  var COOL = { 1: 1000, 2: 1000, 3: 600, 4: 800 };
-
   // 看门狗阈值（毫秒）
   var WD = {
     period: 2000,        // 体检周期
@@ -134,8 +130,7 @@
     status(S.locked ? '已触发 · 收手或换手势'
       : ('识别到 ' + (POSE_NAME[S.poseNow] || S.poseNow) + ' · ' + Math.round(held) + 'ms'));
 
-    var needCool = COOL[S.poseNow] || P.cool;
-    if (!S.locked && held >= P.hold && now - S.lastFire >= needCool) {
+    if (!S.locked && held >= P.hold && now - S.lastFire >= P.cool) {
       S.lastFire = now;
       S.lastPose = S.poseNow;
       S.locked = true;
