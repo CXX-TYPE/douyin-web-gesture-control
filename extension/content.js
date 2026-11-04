@@ -187,12 +187,92 @@
     return '倍速被页面改回';
   }
 
-  function togglePause() {
-    var v = currentVideo() || pickVideo(true) || pickVideo(false);
-    if (!v) return '没有视频';
-    if (v.paused) { v.play().catch(function () {}); return '继续播放'; }
-    v.pause();
-    return '已暂停';
+  // ---------- 暂停 / 继续 ----------
+  // 抖音有两类作品：普通视频（有可见 <video>）、图文作品（图片轮播，
+  // 只有 1x1 的隐藏 video 在放 BGM）。原来只找可见 video，
+  // 遇到图文作品直接返回「没有视频」——这就是「图片视频暂停不了」的原因。
+  //
+  // 现在三级降级：控 video 元素 → 发空格 → 点播放器上的按钮。
+  function anyMedia() {
+    var best = null, bestScore = -1;
+    Array.prototype.slice.call(document.querySelectorAll('video,audio')).forEach(function (v) {
+      var r = v.getBoundingClientRect();
+      var score = Math.max(0, r.width) * Math.max(0, r.height);
+      if (!v.paused) score += 1e7;
+      if (!v.muted) score += 5e6;
+      if (score > bestScore) { bestScore = score; best = v; }
+    });
+    return best;
+  }
+
+  function keyEvent(type, key, code, keyCode) {
+    var e = new KeyboardEvent(type, {
+      key: key, code: code, bubbles: true, cancelable: true, view: window
+    });
+    // 部分播放器只看 keyCode，用 defineProperty 补上（构造函数不接受这两个字段）
+    try {
+      Object.defineProperty(e, 'keyCode', { get: function () { return keyCode; } });
+      Object.defineProperty(e, 'which', { get: function () { return keyCode; } });
+    } catch (err) {}
+    return e;
+  }
+
+  function pressSpace() {
+    var a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return false;
+    var target = document.body || document.documentElement || document;
+    target.dispatchEvent(keyEvent('keydown', ' ', 'Space', 32));
+    setTimeout(function () {
+      target.dispatchEvent(keyEvent('keyup', ' ', 'Space', 32));
+    }, 60);
+    return true;
+  }
+
+  // 找播放器上的播放/暂停控件，按语义匹配，不依赖混淆类名
+  function tapToggleButton() {
+    var nodes = document.querySelectorAll('[aria-label],[title],[data-e2e]');
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      var tag = (el.getAttribute('aria-label') || '') + ' ' +
+                (el.getAttribute('title') || '') + ' ' +
+                (el.getAttribute('data-e2e') || '');
+      if (!/暂停|播放|pause|play/i.test(tag)) continue;
+      if (/player|playlist|playback/i.test(tag)) continue;
+      var r = el.getBoundingClientRect();
+      if (r.width > 4 && r.height > 4 && r.bottom > 0 && r.top < innerHeight) {
+        try { el.click(); return true; } catch (e) {}
+      }
+    }
+    return false;
+  }
+
+  async function togglePause() {
+    var v = currentVideo() || anyMedia();
+    var wantPause = v ? !v.paused : true;
+
+    // ① 直接控制媒体元素：最可靠
+    if (v) {
+      try {
+        if (wantPause) v.pause();
+        else await v.play();
+      } catch (e) {}
+      await sleep(220);
+      if (v.paused === wantPause) return wantPause ? '已暂停' : '继续播放';
+    }
+
+    // ② 空格键：图文作品、或播放器把 pause 顶回来时走这条
+    pressSpace();
+    await sleep(380);
+    if (v && v.paused === wantPause) return wantPause ? '已暂停' : '继续播放';
+
+    // ③ 点播放器控件
+    if (tapToggleButton()) {
+      await sleep(320);
+      return wantPause ? '已暂停' : '继续播放';
+    }
+
+    // 没有可读的 paused 状态时无法验证，如实告知而不是假装成功
+    return v ? '播放器未响应' : '已发送暂停指令';
   }
 
   async function run(act) {
@@ -205,7 +285,7 @@
       return;
     }
     if (act === 'speed') { flash(await cycleSpeed()); return; }
-    if (act === 'pause') { flash(togglePause()); return; }
+    if (act === 'pause') { flash(await togglePause()); return; }
   }
 
   // ---------- 开关 ----------
@@ -231,10 +311,13 @@
   }
 
   // ---------- 消息 ----------
+  var lastMsgT = Date.now();
+
   window.addEventListener('message', function (ev) {
     if (ev.source !== window) return;
     var d = ev.data;
     if (!d || d.source !== 'dy-gesture') return;
+    lastMsgT = Date.now();
 
     if (d.type === 'ready') {
       try {
@@ -280,6 +363,16 @@
       return true;
     });
   } catch (e) {}
+
+  // 心跳兜底：注入模块万一完全静默（模型崩溃、循环中断），
+  // 这里主动让它自检一次，用户不用手动关开开关
+  setInterval(function () {
+    if (!enabled || document.hidden) return;
+    if (Date.now() - lastMsgT > 12000) {
+      lastMsgT = Date.now();
+      send('ensure');
+    }
+  }, 4000);
 
   buildPill();
 })();

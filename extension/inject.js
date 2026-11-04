@@ -1,7 +1,12 @@
 /**
  * 运行在页面主世界（MAIN world）：
- * 负责摄像头取流 + MediaPipe 手部识别 + 手势状态机。
+ * 摄像头取流 + MediaPipe 手部识别 + 手势状态机。
  * 识别到动作后通过 postMessage 通知 content.js 执行，不直接操作页面 DOM。
+ *
+ * v0.6.0 稳定性改造（解决「用着用着突然没反应，要重新开关一次」）：
+ *   ① 送帧超时保护 —— send() 的 Promise 永不 resolve 时，busy 不会永久锁死
+ *   ② 看门狗每 2 秒体检 —— 摄像头轨道 / 识别心跳 / 送帧卡顿
+ *   ③ 异常自动重建链路 —— 不需要用户手动关开开关
  */
 (function () {
   if (window.__DY_GESTURE__) return;
@@ -12,14 +17,30 @@
   // 与 PRD v0.4.1 §5 参数表一致
   var P = { hold: 300, cool: 1000, curl: 1.15, spread: 0.28, thumb: 0.30, edge: 0.015, minPw: 22 };
 
+  // 看门狗阈值（毫秒）
+  var WD = {
+    period: 2000,        // 体检周期
+    noResult: 8000,      // 超过这个时间没有识别结果 → 判定卡死
+    sendTimeout: 4000,   // 单次送帧超时
+    restartGap: 8000,    // 两次自动重启的最小间隔
+    maxRestart: 3,       // 连续自动重启上限
+    forgetAfter: 60000   // 连续稳定运行这么久之后，重启计数清零
+  };
+
   var S = {
-    running: false, stream: null, hands: null,
+    running: false, starting: false, stream: null, hands: null,
     poseNow: 0, poseSince: 0, locked: false, lastPose: 0, lastFire: 0,
-    busy: false, frameSeq: 0, lastSentSeq: -1
+    busy: false, sendStuck: 0,
+    frameSeq: 0, lastSentSeq: -1, lastSeqT: 0,
+    results: 0, lastResultT: 0,
+    restartCount: 0, lastRestartT: 0
   };
 
   var video = null;
   var lastStatus = '';
+  var wdTimer = null;
+
+  function tnow() { return performance.now(); }
 
   function post(obj) {
     obj.source = 'dy-gesture';
@@ -42,14 +63,7 @@
     var ratio = FING.map(function (f) {
       return dist(p[0], p[f[2]]) / (dist(p[0], p[f[1]]) || 0.0001);
     });
-    var ext = ratio.map(function (r) { return r > P.curl; });
 
-    // 拇指判据改成「拇指尖是五指里离腕最远的」——
-    // 只看 4↔5 的距离在真实的手背上经常测不准（拇指贴着食指根）
-    var thumbFar = dist(p[0], p[4]) / pw;
-    var othersMax = Math.max(
-      dist(p[0], p[8]), dist(p[0], p[12]), dist(p[0], p[16]), dist(p[0], p[20])
-    ) / pw;
     // 真正区分"竖拇指"和"握拳"的，是拇指尖离食指尖有多远：
     // 握拳时拇指压在四指上，两者几乎贴在一起；竖拇指时明显分开
     var thumbAway = dist(p[4], p[8]) / pw;
@@ -77,13 +91,17 @@
     });
     var edge = minX < P.edge || maxX > 1 - P.edge || minY < P.edge || maxY > 1 - P.edge;
 
-    return { pose: pose, edge: edge, pw: pw };
+    return { pose: pose, edge: edge, pw: pw, thumbExt: thumbExt };
   }
 
   // ---------- 状态机：armed → holding → firing → locked ----------
   function onResults(res) {
+    // 心跳：只要这里被调用，就说明「摄像头 → 模型 → 回调」这条链路是活的
+    S.results++;
+    S.lastResultT = tnow();
+
     var lm = res.multiHandLandmarks && res.multiHandLandmarks[0];
-    var now = performance.now();
+    var now = tnow();
 
     if (!lm) {
       S.poseNow = 0; S.poseSince = 0; S.locked = false; S.lastPose = 0;
@@ -91,7 +109,8 @@
       return;
     }
 
-    var W = video.videoWidth || 640, H = video.videoHeight || 480;
+    var W = (video && video.videoWidth) || 640;
+    var H = (video && video.videoHeight) || 480;
     var e = evaluate(lm, W, H);
 
     if (e.edge) { status('手太靠边 · 往中间挪'); return; }
@@ -120,17 +139,56 @@
     }
   }
 
-  function pump() {
-    if (!S.running) return;
-    var fresh = !video.requestVideoFrameCallback || S.frameSeq !== S.lastSentSeq;
-    if (video.readyState >= 2 && !S.busy && fresh) {
-      S.lastSentSeq = S.frameSeq;
-      S.busy = true;
-      S.hands.send({ image: video }).catch(function () {}).then(function () { S.busy = false; });
+  // ---------- 送帧 ----------
+  function sendFrame() {
+    var done = false;
+    var guard = setTimeout(function () {
+      if (done) return;
+      S.busy = false;                     // 解开锁，否则整条链路永久冻结
+      S.sendStuck = (S.sendStuck || 0) + 1;
+    }, WD.sendTimeout);
+
+    var p;
+    try {
+      p = S.hands.send({ image: video });
+    } catch (err) {
+      clearTimeout(guard);
+      S.busy = false;
+      S.sendStuck = (S.sendStuck || 0) + 1;
+      return;
     }
-    requestAnimationFrame(pump);
+
+    p.catch(function () {}).then(function () {
+      done = true;
+      clearTimeout(guard);
+      S.busy = false;
+      S.sendStuck = 0;
+    });
   }
 
+  function pump() {
+    if (!S.running) return;
+    try {
+      var now = tnow();
+      if (video && video.readyState >= 2 && !S.busy) {
+        var fresh = S.frameSeq !== S.lastSentSeq;
+        // requestVideoFrameCallback 万一下降级/停止，1.2 秒没有新帧也要兜底送一次，
+        // 避免「帧序号不涨 → 永远不送帧」这种整条链路冻结
+        if (!fresh && now - S.lastSeqT > 1200) fresh = true;
+
+        if (fresh) {
+          S.lastSentSeq = S.frameSeq;
+          S.busy = true;
+          sendFrame();
+        }
+      }
+    } catch (err) {
+      S.busy = false;
+    }
+    requestAnimationFrame(pump);   // 放在 try 外面，保证循环永不中断
+  }
+
+  // ---------- 模型 ----------
   function loadHands() {
     if (window.Hands) return Promise.resolve();
     return new Promise(function (resolve, reject) {
@@ -144,8 +202,50 @@
     });
   }
 
+  function buildHands() {
+    if (!window.Hands) return false;
+    try {
+      if (S.hands) { try { S.hands.close(); } catch (e) {} }
+      S.hands = new window.Hands({ locateFile: function (f) { return CDN + '/' + f; } });
+      S.hands.setOptions({
+        maxNumHands: 1, modelComplexity: 0,
+        minDetectionConfidence: 0.6, minTrackingConfidence: 0.6
+      });
+      S.hands.onResults(onResults);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // ---------- 生命周期 ----------
+  function realStop() {
+    S.running = false;
+    S.starting = false;
+    S.busy = false;
+    S.sendStuck = 0;
+
+    if (S.stream) {
+      try { S.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+      S.stream = null;
+    }
+    if (video) { try { video.srcObject = null; } catch (e) {} }
+    if (S.hands) { try { S.hands.close(); } catch (e) {} S.hands = null; }
+
+    lastStatus = '';
+  }
+
+  function stop() {
+    realStop();
+    S.restartCount = 0;
+    S.lastRestartT = 0;
+    post({ type: 'state', on: false });
+  }
+
   async function start() {
-    if (S.running) return;
+    if (S.running || S.starting) return;
+    S.starting = true;
+
     try {
       status('正在请求摄像头…');
       var stream = await navigator.mediaDevices.getUserMedia({
@@ -153,6 +253,14 @@
         audio: false
       });
       S.stream = stream;
+
+      // 摄像头被其他程序抢占 / 设备被拔掉时，轨道会 ended，立即触发恢复
+      var track = stream.getVideoTracks()[0];
+      if (track) {
+        track.addEventListener('ended', function () {
+          if (S.running) autoRestart('摄像头已断开');
+        });
+      }
 
       if (!video) {
         video = document.createElement('video');
@@ -166,48 +274,141 @@
 
       await loadHands();
       status('模型加载中…');
+      if (!buildHands()) throw new Error('识别模型初始化失败');
 
-      S.hands = new window.Hands({ locateFile: function (f) { return CDN + '/' + f; } });
-      S.hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
-      S.hands.onResults(onResults);
-
+      // 每次启动都彻底重置状态，避免上一轮的 busy / 计数残留
       S.running = true;
+      S.starting = false;
+      S.busy = false;
+      S.sendStuck = 0;
       S.poseNow = 0; S.poseSince = 0; S.locked = false; S.lastPose = 0; S.lastFire = 0;
-      S.frameSeq = 0; S.lastSentSeq = -1;
+      S.results = 0; S.lastResultT = tnow();
+      S.frameSeq = 0; S.lastSentSeq = -1; S.lastSeqT = tnow();
 
       if (video.requestVideoFrameCallback) {
         (function tick() {
           if (!S.running) return;
           S.frameSeq++;
+          S.lastSeqT = tnow();
           video.requestVideoFrameCallback(tick);
         })();
       }
+
       pump();
+      startWatchdog();
       status('待命 · 比 1 或 2');
       post({ type: 'state', on: true });
     } catch (err) {
-      stop();
-      status('启动失败：' + (err && err.name === 'NotAllowedError' ? '摄像头被拒绝' : (err.message || '未知错误')));
+      S.starting = false;
+      realStop();
+      var msg = err && err.name === 'NotAllowedError' ? '摄像头被拒绝'
+        : (err && err.name === 'NotReadableError' ? '摄像头被其他程序占用'
+          : (err && err.message) || '未知错误');
+      status('启动失败：' + msg);
       post({ type: 'state', on: false });
     }
   }
 
-  function stop() {
-    S.running = false;
-    if (S.stream) { S.stream.getTracks().forEach(function (t) { t.stop(); }); S.stream = null; }
-    if (video) video.srcObject = null;
-    lastStatus = '';
-    post({ type: 'state', on: false });
+  async function restart() {
+    if (S.starting) return;
+    realStop();
+    await new Promise(function (r) { setTimeout(r, 500); });
+    await start();
   }
 
+  // ---------- 看门狗 ----------
+  function autoRestart(reason) {
+    var now = tnow();
+    if (now - S.lastRestartT < WD.restartGap) return;
+
+    // 稳定运行足够久，说明之前几次重启是偶发，计数清零
+    if (now - S.lastRestartT > WD.forgetAfter) S.restartCount = 0;
+
+    if (S.restartCount >= WD.maxRestart) {
+      status('识别异常 · 按 Alt+Shift+G 重开');
+      return;
+    }
+
+    S.lastRestartT = now;
+    S.restartCount++;
+    status('自动恢复 ' + S.restartCount + '/' + WD.maxRestart + ' · ' + reason);
+    restart();
+  }
+
+  function watchdog() {
+    if (!S.running || S.starting) return;
+    // 后台标签页会被浏览器节流，此时不判异常，避免误重启
+    if (document.hidden) return;
+
+    var now = tnow();
+
+    // ① 摄像头轨道
+    var tracks = S.stream ? S.stream.getVideoTracks() : [];
+    if (!tracks.length) return autoRestart('摄像头已断开');
+    if (tracks[0].readyState === 'ended') return autoRestart('摄像头已释放');
+
+    // ② 识别心跳：送帧一直在跑，但 onResults 不回调，说明模型内部卡住
+    if (S.lastResultT && now - S.lastResultT > WD.noResult) {
+      return autoRestart('识别无响应');
+    }
+
+    // ③ 连续送帧超时 → 只重建模型，比重启整条链路轻
+    if (S.sendStuck >= 2) {
+      S.sendStuck = 0;
+      S.busy = false;
+      if (buildHands()) status('模型已重建');
+      else autoRestart('模型重建失败');
+    }
+  }
+
+  function startWatchdog() {
+    if (wdTimer) return;
+    wdTimer = setInterval(watchdog, WD.period);
+  }
+
+  // 从后台切回前台：如果已经很久没有识别结果，立刻自愈一次
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden || !S.running) return;
+    if (S.lastResultT && tnow() - S.lastResultT > WD.noResult) {
+      S.restartCount = 0;
+      S.lastRestartT = 0;
+      autoRestart('页面恢复');
+    }
+  });
+
+  // ---------- 消息 ----------
   window.addEventListener('message', function (ev) {
     if (ev.source !== window) return;
     var d = ev.data;
     if (!d || d.source !== 'dy-ctrl') return;
+
     if (d.cmd === 'start') start();
     if (d.cmd === 'stop') stop();
     if (d.cmd === 'ping') post({ type: 'pong' });
+
+    // 内容脚本发来的健康检查：正常时什么都不做，异常时顺手修一下
+    if (d.cmd === 'ensure') {
+      if (!S.running) start();
+      else if (S.lastResultT && tnow() - S.lastResultT > WD.noResult) autoRestart('心跳超时');
+    }
   });
+
+  // 调试钩子：只给自动化测试用，不参与业务逻辑
+  try {
+    window.__DY_GESTURE_DEBUG__ = {
+      state: function () {
+        return {
+          running: S.running, starting: S.starting, busy: S.busy,
+          results: S.results, frameSeq: S.frameSeq,
+          pose: S.poseNow, locked: S.locked,
+          restartCount: S.restartCount,
+          sinceResult: S.lastResultT ? Math.round(tnow() - S.lastResultT) : -1
+        };
+      },
+      killResults: function () { S.lastResultT = tnow() - 999999; },
+      forceBusy: function () { S.busy = true; }
+    };
+  } catch (e) {}
 
   // 页面加载后主动报到，content.js 会据此决定是否自动开启
   post({ type: 'ready' });
