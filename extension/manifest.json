@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "抖音手势控制",
-  "version": "0.1.0",
+  "version": "0.6.1",
   "description": "用摄像头识别手势控制抖音网页版：比 1 上一个、比 2 下一个、竖拇指快进、五指张开暂停。",
   "permissions": ["storage"],
   "host_permissions": ["https://www.douyin.com/*"],

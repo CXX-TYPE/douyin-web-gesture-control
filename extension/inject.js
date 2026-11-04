@@ -12,7 +12,16 @@
   if (window.__DY_GESTURE__) return;
   window.__DY_GESTURE__ = true;
 
-  var CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240';
+  // 模型来源：主源 + 两个备用源。
+  // 只用单一 CDN 时，一旦它不可达（国内 jsDelivr 偶尔抽风），
+  // 识别会静默失败，用户只看到「模型加载超时」却不知道换源。
+  var CDN_LIST = [
+    'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240',
+    'https://fastly.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240',
+    'https://unpkg.com/@mediapipe/hands@0.4.1675469240'
+  ];
+  var CDN = CDN_LIST[0];       // 实际生效的源，加载成功后被锁定
+  var CDN_TIMEOUT = 6000;      // 单个源的超时
 
   // 与 PRD v0.4.1 §5 参数表一致
   var P = { hold: 300, cool: 1000, curl: 1.15, spread: 0.28, thumb: 0.30, edge: 0.015, minPw: 22 };
@@ -189,17 +198,46 @@
   }
 
   // ---------- 模型 ----------
-  function loadHands() {
-    if (window.Hands) return Promise.resolve();
+  function loadScript(url, timeout) {
     return new Promise(function (resolve, reject) {
       var s = document.createElement('script');
-      s.src = CDN + '/hands.js';
+      var done = false;
+      function finish(ok, err) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (ok) resolve(); else {
+          try { s.remove(); } catch (e) {}
+          reject(err || new Error('load error'));
+        }
+      }
+      var timer = setTimeout(function () { finish(false, new Error('timeout')); }, timeout);
+      s.src = url;
       s.crossOrigin = 'anonymous';
-      s.onload = resolve;
-      s.onerror = function () { reject(new Error('识别模型加载失败，检查网络')); };
+      s.onload = function () { finish(true); };
+      s.onerror = function () { finish(false, new Error('load error')); };
       document.head.appendChild(s);
-      setTimeout(function () { window.Hands ? resolve() : reject(new Error('模型加载超时')); }, 15000);
     });
+  }
+
+  // 依次尝试 CDN_LIST，第一个成功的会被锁定（模型文件必须与 hands.js 同源）
+  async function loadHands() {
+    if (window.Hands) return;
+    var lastErr = null;
+    for (var i = 0; i < CDN_LIST.length; i++) {
+      try {
+        status(i === 0 ? '模型加载中…' : ('切换到备用源 ' + (i + 1) + '…'));
+        await loadScript(CDN_LIST[i] + '/hands.js', CDN_TIMEOUT);
+        if (window.Hands) {
+          CDN = CDN_LIST[i];
+          post({ type: 'status', text: '模型源 ' + (i + 1) });
+          return;
+        }
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    throw (lastErr || new Error('识别模型加载失败，检查网络'));
   }
 
   function buildHands() {
@@ -406,6 +444,14 @@
         };
       },
       killResults: function () { S.lastResultT = tnow() - 999999; },
+      cdn: function () { return CDN; },
+      // 跳过摄像头，单独触发模型加载，用于验证 CDN 降级
+      loadModel: function () {
+        return loadHands().then(
+          function () { return CDN; },
+          function (e) { return 'FAIL: ' + (e && e.message); }
+        );
+      },
       forceBusy: function () { S.busy = true; }
     };
   } catch (e) {}
