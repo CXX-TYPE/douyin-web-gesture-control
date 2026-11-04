@@ -88,14 +88,20 @@
   }
 
   // ---------- 动作 ----------
+  // 抖音播放页有两层 video：主视频和背景虚化视频，位置几乎重合。
+  // 只按"视口中心"挑会挑到虚化那层——表现就是"倍速/暂停按了没反应"。
+  // 改成打分：优先在播、优先有声、再看可见面积。
   function currentVideo() {
-    var vids = Array.prototype.slice.call(document.querySelectorAll('video'))
-      .filter(function (v) { return v.getBoundingClientRect().height > 100; });
-    var mid = innerHeight / 2, best = null, bestD = 1e9;
-    vids.forEach(function (v) {
+    var best = null, bestScore = -1;
+    Array.prototype.slice.call(document.querySelectorAll('video')).forEach(function (v) {
       var r = v.getBoundingClientRect();
-      var d = Math.abs((r.top + r.bottom) / 2 - mid);
-      if (d < bestD) { bestD = d; best = v; }
+      if (r.height < 100 || r.width < 100) return;
+      var vis = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)) *
+                Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0));
+      var score = vis;
+      if (!v.paused) score += 1e7;
+      if (!v.muted) score += 5e6;
+      if (score > bestScore) { bestScore = score; best = v; }
     });
     return best;
   }
@@ -137,13 +143,20 @@
     return 'failed';
   }
 
-  function cycleSpeed() {
+  async function cycleSpeed() {
     var v = currentVideo() || pickVideo(true) || pickVideo(false);
     if (!v) return '没有视频';
-    var cur = v.playbackRate;
-    var next = cur < 1.5 ? 2 : (cur < 3 ? 4 : 1);
+    var next = v.playbackRate < 1.5 ? 2 : (v.playbackRate < 3 ? 4 : 1);
+
+    v.defaultPlaybackRate = next;
     v.playbackRate = next;
-    return next + ' 倍速';
+    await sleep(150);
+    // 抖音播放器有时会把速率改回 1，检测到就再设一次
+    if (Math.abs(v.playbackRate - next) > 0.01) {
+      v.playbackRate = next;
+      await sleep(200);
+    }
+    return Math.abs(v.playbackRate - next) < 0.01 ? (next + ' 倍速') : '倍速被页面改回';
   }
 
   function togglePause() {
@@ -158,10 +171,12 @@
     if (act === 'next' || act === 'prev') {
       var how = await step(act === 'next' ? 1 : -1);
       var ok = how !== 'failed';
-      flash(ok ? (act === 'next' ? '下一个' : '上一个') : '切换失败', !ok);
+      var inFeed = location.href.indexOf('recommend') >= 0;
+      flash(ok ? (act === 'next' ? '下一个' : '上一个')
+             : (inFeed ? '切换失败' : '切换失败 · 请进推荐流'), !ok);
       return;
     }
-    if (act === 'speed') { flash(cycleSpeed()); return; }
+    if (act === 'speed') { flash(await cycleSpeed()); return; }
     if (act === 'pause') { flash(togglePause()); return; }
   }
 
