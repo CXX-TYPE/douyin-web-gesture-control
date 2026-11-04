@@ -511,16 +511,21 @@
     var ext = ratio.map(function(r){ return r > P.curl; });
 
     // 拇指是否伸开：指尖(4) 离食指根(5) 足够远，说明没压在掌心里
-    var thumbExt = dist(p[4], p[5]) / pw > 0.45;
+    var thumbExt = dist(p[4], p[5]) / pw > 0.30;
     // 张开程度：相邻指尖的最大间距，用来区分「五指张开」和「五指并拢的平掌」
     var gaps = [dist(p[8], p[12]), dist(p[12], p[16]), dist(p[16], p[20])].map(function(d){ return d / pw; });
     var spread = (gaps[0] + gaps[1] + gaps[2]) / 3;   // 取平均，避免某一根手指抖动就把"张开"判错
 
+    // 显式余量：伸直 > curl+0.06、弯曲 < curl-0.06；半伸不参与任何手势
+    var HI = P.curl + 0.06, LO = P.curl - 0.06;
+    var up = ratio.map(function (r) { return r > HI; });
+    var down = ratio.map(function (r) { return r < LO; });
+
     var pose = 0, act = '';
-    if (ext[0] && !ext[1] && !ext[2] && !ext[3]) { pose = 1; act = 'next'; }              // 比 1 → 下一个
-    else if (ext[0] && ext[1] && !ext[2] && !ext[3]) { pose = 2; act = 'prev'; }          // 比 2 → 上一个
-    else if (thumbExt && !ext[0] && !ext[1] && !ext[2] && !ext[3]) { pose = 3; act = 'speed'; }  // 竖拇指 → 快进
-    else if (ext[0] && ext[1] && ext[2] && ext[3] && spread > 0.28) { pose = 4; act = 'pause'; } // 五指张开 → 暂停
+    if (up[0] && down[1] && down[2] && down[3]) { pose = 1; act = 'next'; }
+    else if (up[0] && up[1] && down[2] && down[3]) { pose = 2; act = 'prev'; }
+    else if (thumbExt && !up[0] && !up[1] && !(up[2] && up[3])) { pose = 3; act = 'speed'; }
+    else if (up[0] && up[1] && up[2] && up[3] && spread > 0.28) { pose = 4; act = 'pause'; }
 
     // 朝向：掌面法向量的 z 分量占比。正对镜头接近 1，侧对镜头接近 0。
     var ax = p[5].x - p[0].x, ay = p[5].y - p[0].y, az = p[5].z - p[0].z;

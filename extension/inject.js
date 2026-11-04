@@ -10,7 +10,7 @@
   var CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240';
 
   // 与 PRD v0.4.1 §5 参数表一致
-  var P = { hold: 300, cool: 1000, curl: 1.15, spread: 0.28, thumb: 0.45, edge: 0.015, minPw: 22 };
+  var P = { hold: 300, cool: 1000, curl: 1.15, spread: 0.28, thumb: 0.30, edge: 0.015, minPw: 22 };
 
   var S = {
     running: false, stream: null, hands: null,
@@ -48,11 +48,18 @@
     var gaps = [dist(p[8], p[12]), dist(p[12], p[16]), dist(p[16], p[20])].map(function (d) { return d / pw; });
     var spread = (gaps[0] + gaps[1] + gaps[2]) / 3;
 
-    var pose = 0, act = '';
-    if (ext[0] && !ext[1] && !ext[2] && !ext[3]) { pose = 1; act = 'next'; }
-    else if (ext[0] && ext[1] && !ext[2] && !ext[3]) { pose = 2; act = 'prev'; }
-    else if (thumbExt && !ext[0] && !ext[1] && !ext[2] && !ext[3]) { pose = 3; act = 'speed'; }
-    else if (ext[0] && ext[1] && ext[2] && ext[3] && spread > P.spread) { pose = 4; act = 'pause'; }
+    // 显式余量：伸直要 > curl+0.06，弯曲要 < curl-0.06。
+    // 落在中间的「半伸」不参与任何手势——宁可这一次不响应，
+    // 也不要把「比 1」认成「比 2」。方向误判比没反应严重得多。
+    var HI = P.curl + 0.06, LO = P.curl - 0.06;
+    var up = ratio.map(function (r) { return r > HI; });
+    var down = ratio.map(function (r) { return r < LO; });
+
+    var pose = 0;
+    if (up[0] && down[1] && down[2] && down[3]) { pose = 1; }
+    else if (up[0] && up[1] && down[2] && down[3]) { pose = 2; }
+    else if (thumbExt && !up[0] && !up[1] && !(up[2] && up[3])) { pose = 3; }
+    else if (up[0] && up[1] && up[2] && up[3] && spread > P.spread) { pose = 4; }
 
     var minX = 1, maxX = 0, minY = 1, maxY = 0;
     lm.forEach(function (q) {
@@ -61,7 +68,7 @@
     });
     var edge = minX < P.edge || maxX > 1 - P.edge || minY < P.edge || maxY > 1 - P.edge;
 
-    return { pose: pose, act: act, edge: edge, pw: pw };
+    return { pose: pose, edge: edge, pw: pw };
   }
 
   // ---------- 状态机：armed → holding → firing → locked ----------
@@ -89,16 +96,18 @@
       else if (S.poseNow !== S.lastPose && now - S.lastFire > 350) S.locked = false;
     }
 
-    if (!S.poseNow) { status('已检测到手'); return; }
+    if (!S.poseNow) { status('已检测到手 · 手势不明确'); return; }
 
-    status(S.locked ? '已触发 · 收手或换手势' : ('识别到 ' + e.pose + ' · ' + Math.round(held) + 'ms'));
+    var POSE_NAME = { 1: '比1', 2: '比2', 3: '竖拇指', 4: '五指张开' };
+    status(S.locked ? '已触发 · 收手或换手势'
+      : ('识别到 ' + (POSE_NAME[S.poseNow] || S.poseNow) + ' · ' + Math.round(held) + 'ms'));
 
     if (!S.locked && held >= P.hold && now - S.lastFire >= P.cool) {
       S.lastFire = now;
       S.lastPose = S.poseNow;
       S.locked = true;
       S.poseSince = now;
-      post({ type: 'gesture', act: e.act, pose: e.pose });
+      post({ type: 'gesture', pose: e.pose });
     }
   }
 

@@ -24,6 +24,10 @@
   .foot{padding:10px 16px 14px;font-size:11px;color:#6f7787;border-top:1px solid var(--line);}
   .warn{color:#ffb84d;font-size:11.5px;margin-top:8px;display:none;}
   .warn.show{display:block;}
+  .seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;}
+  .seg button{background:none;border:0;color:var(--dim);font-size:11.5px;padding:4px 10px;cursor:pointer;font-family:inherit;}
+  .seg button.on{background:rgba(37,244,238,.16);color:var(--cyan);}
+  .hint{font-size:10.5px;color:#6f7787;margin:-4px 0 10px;line-height:1.6;}
 </style>
 </head>
 <body>
@@ -37,6 +41,15 @@
       <span>手势控制</span>
       <div class="switch" id="sw"></div>
     </div>
+
+    <div class="row">
+      <span>比 1 切向</span>
+      <div class="seg" id="seg">
+        <button data-v="0" class="on">下一个</button>
+        <button data-v="1">上一个</button>
+      </div>
+    </div>
+    <div class="hint">如果实测方向相反，在这里翻一下即可，不用改代码。</div>
 
     <div class="list">
       <div class="item"><span>比 1</span><b>下一个</b></div>

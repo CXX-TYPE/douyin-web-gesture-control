@@ -4,6 +4,7 @@ var stateEl = document.getElementById('state');
 var warn = document.getElementById('warn');
 var tabId = null;
 var enabled = false;
+var swap = false;
 
 function render() {
   sw.classList.toggle('on', enabled);
@@ -21,7 +22,9 @@ chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
   chrome.tabs.sendMessage(tabId, { cmd: 'get' }, function (res) {
     if (chrome.runtime.lastError || !res) { warn.classList.add('show'); return; }
     enabled = !!res.enabled;
+    swap = !!res.swap12;
     render();
+    renderSeg();
   });
 });
 
@@ -35,3 +38,23 @@ sw.addEventListener('click', function () {
 });
 
 render();
+
+// ---------- 比 1 方向 ----------
+var seg = document.getElementById('seg');
+function renderSeg() {
+  Array.prototype.forEach.call(seg.querySelectorAll('button'), function (b) {
+    b.classList.toggle('on', (b.getAttribute('data-v') === '1') === swap);
+  });
+}
+seg.addEventListener('click', function (e) {
+  var btn = e.target.closest('button');
+  if (!btn) return;
+  swap = btn.getAttribute('data-v') === '1';
+  renderSeg();
+  if (tabId == null) return;
+  chrome.tabs.sendMessage(tabId, { cmd: 'setSwap', value: swap }, function () {
+    if (chrome.runtime.lastError) { /* ignore */ }
+    chrome.storage.local.set({ dyGestureSwap12: swap });
+  });
+});
+renderSeg();

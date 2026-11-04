@@ -167,6 +167,16 @@
 
   // ---------- 开关 ----------
   var enabled = false;
+  var swap12 = false;   // true 时：比 1 = 上一个，比 2 = 下一个
+
+  // 手势 → 动作。方向抽成配置，万一判反了不用改代码，弹窗里拨一下就行
+  function actOf(pose) {
+    if (pose === 1) return swap12 ? 'prev' : 'next';
+    if (pose === 2) return swap12 ? 'next' : 'prev';
+    if (pose === 3) return 'speed';
+    if (pose === 4) return 'pause';
+    return '';
+  }
 
   function send(cmd) { window.postMessage({ source: 'dy-ctrl', cmd: cmd }, '*'); }
 
@@ -185,8 +195,9 @@
 
     if (d.type === 'ready') {
       try {
-        chrome.storage.local.get([LS_KEY], function (r) {
+        chrome.storage.local.get([LS_KEY, 'dyGestureSwap12'], function (r) {
           enabled = !!r[LS_KEY];
+          swap12 = !!r.dyGestureSwap12;
           setPill(enabled, enabled ? '手势 开' : '手势 关');
           if (enabled) send('start');
         });
@@ -201,7 +212,11 @@
       if (!enabled) setPill(false, '手势 关');
       return;
     }
-    if (d.type === 'gesture') { run(d.act); return; }
+    if (d.type === 'gesture') {
+      var act = actOf(d.pose);
+      if (act) run(act);
+      return;
+    }
   });
 
   // 页内快捷键：Alt + Shift + G
@@ -217,7 +232,8 @@
     chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
       if (!msg) return;
       if (msg.cmd === 'set') { setEnabled(!!msg.value); sendResponse({ enabled: enabled }); }
-      if (msg.cmd === 'get') { sendResponse({ enabled: enabled }); }
+      if (msg.cmd === 'get') { sendResponse({ enabled: enabled, swap12: swap12 }); }
+      if (msg.cmd === 'setSwap') { swap12 = !!msg.value; sendResponse({ swap12: swap12 }); }
       return true;
     });
   } catch (e) {}
