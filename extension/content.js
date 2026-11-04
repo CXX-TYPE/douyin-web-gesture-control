@@ -160,6 +160,12 @@
     return 'failed';
   }
 
+  // 倍速只做 1× ↔ 2× 两档。
+  // 原来的 1→2→4 三段循环在实际使用中加不上去：抖音切视频 / 暂停后会把
+  // playbackRate 重置回 1，用户再竖一次又只到 2，永远摸不到 4。
+  // 两档的好处是状态永远可预期：不是 1 就是 2。
+  function nextSpeed(cur) { return cur >= 1.5 ? 1 : 2; }
+
   async function cycleSpeed() {
     var cands = rankVideos();
     if (!cands.length) { var one = pickVideo(true) || pickVideo(false); if (one) cands = [one]; }
@@ -169,7 +175,7 @@
     // 只有真的把速率改成功的那一条才算数
     for (var i = 0; i < Math.min(cands.length, 3); i++) {
       var v = cands[i];
-      var next = v.playbackRate < 1.5 ? 2 : (v.playbackRate < 3 ? 4 : 1);
+      var next = nextSpeed(v.playbackRate);
       try {
         v.defaultPlaybackRate = next;
         v.playbackRate = next;

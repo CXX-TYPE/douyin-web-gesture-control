@@ -324,7 +324,7 @@
         </div>
         <div class="gesture-item">
           <svg viewBox="0 0 40 44"><path d="M15 40c0-6 1-10 1-14V14a3 3 0 0 1 6 0v9"/><path d="M22 23v-2a2.6 2.6 0 0 1 5.2 0v6"/><path d="M27.2 27v-3a2.6 2.6 0 0 1 5.2 0v9c0 4-3 7-7 7h-3c-4 0-7-2-7.5-5"/></svg>
-          <div><div class="g-name">竖大拇指</div><div class="g-desc">→ 快进（1× → 2× → 4×）</div></div>
+          <div><div class="g-name">竖大拇指</div><div class="g-desc">→ 倍速切换（1× ↔ 2×）</div></div>
           <span class="g-key">▶▶</span>
         </div>
         <div class="gesture-item">
@@ -568,9 +568,11 @@
     speedBadge.className = 'player-badge' + (player.speed > 1 ? ' on' : '');
   }
   function cycleSpeed(){
-    player.speed = player.speed === 1 ? 2 : (player.speed === 2 ? 4 : 1);
+    // 只做 1× ↔ 2× 两档：三档在真实播放器上容易「加不上去」，
+    // 因为切视频后 playbackRate 会被重置回 1，用户永远摸不到 4×
+    player.speed = player.speed === 1 ? 2 : 1;
     syncBadge();
-    toast(player.speed === 1 ? '恢复 1 倍速' : ('快进 · ' + player.speed + ' 倍速'));
+    toast(player.speed === 1 ? '恢复 1 倍速' : '快进 · 2 倍速');
   }
   function togglePause(){
     player.paused = !player.paused;
